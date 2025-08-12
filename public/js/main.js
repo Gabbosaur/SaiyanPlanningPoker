@@ -34,16 +34,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const collisionContainer = document.getElementById('collision-container');
     const emojiPanel = document.getElementById('emoji-panel');
     const emojiContainer = document.getElementById('emoji-container');
-    const miniGamesPanel = document.getElementById('mini-games-panel');
-    const reactionGameBtn = document.getElementById('reaction-game-btn');
     const miniGameModal = document.getElementById('mini-game-modal');
-    const closeMiniGame = document.getElementById('close-mini-game');
-    const startReactionGame = document.getElementById('start-reaction-game');
-    const reactionGameArea = document.getElementById('reaction-game-area');
-    const reactionInstruction = document.getElementById('reaction-instruction');
-    const reactionResult = document.getElementById('reaction-result');
-    const reactionTime = document.getElementById('reaction-time');
     const punchSound = document.getElementById('punch-sound');
+    const creditComponent = document.getElementById('credit-component');
+    const heartButton = document.getElementById('heart-button');
+    const creditCard = document.getElementById('credit-card');
 
     // App State
     let sessionId = '';
@@ -65,6 +60,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Audio for celebration with error handling
     const celebrationSound = new Audio('/sounds/super-saiyan.mp3');
+
+    // Credit component
+    if (!creditComponent || !heartButton || !creditCard) {
+        console.error('Credit component elements not found');
+        return;
+    }
+    // Show credit card on hover
+    creditComponent.addEventListener('mouseenter', () => {
+        creditCard.classList.add('visible');
+    });
+
+    // Hide credit card when mouse leaves
+    creditComponent.addEventListener('mouseleave', () => {
+        creditCard.classList.remove('visible');
+    });
+
+    // Handle heart button click
+    if (heartButton) {
+        heartButton.addEventListener('click', function () {
+            // Create floating hearts
+            createFloatingHearts(this);
+
+            // Redirect to LinkedIn after a short delay
+            setTimeout(() => {
+                window.open('https://linkedin.com/in/gabrieleguo', '_blank');
+            }, 450);
+        });
+
+        // Add a subtle bounce effect when clicked
+        heartButton.addEventListener('click', function () {
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 100);
+        });
+    }
+
+    // Function to create floating hearts
+    function createFloatingHearts(element) {
+        const rect = element.getBoundingClientRect();
+        const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
+
+        for (let i = 0; i < 6; i++) {
+            const heart = document.createElement('div');
+            heart.className = 'fixed pointer-events-none z-40';
+            heart.innerHTML = '<i class="fas fa-heart"></i>';
+            heart.style.color = colors[Math.floor(Math.random() * colors.length)];
+            heart.style.left = `${rect.left + rect.width / 2}px`;
+            heart.style.top = `${rect.top + rect.height / 2}px`;
+            heart.style.fontSize = `${Math.random() * 10 + 10}px`;
+            heart.style.opacity = '1';
+            heart.style.transition = 'all 1s ease-out';
+            heart.style.transform = `translate(${(Math.random() - 0.5) * 100}px, ${Math.random() * -50 - 20}px) scale(${Math.random() + 0.5})`;
+
+            document.body.appendChild(heart);
+
+            setTimeout(() => {
+                heart.style.opacity = '0';
+                heart.style.transform += ` translateY(-50px)`;
+            }, 100);
+
+            setTimeout(() => {
+                heart.remove();
+            }, 1100);
+        }
+    }
 
     // Handle audio loading errors
     celebrationSound.addEventListener('error', (e) => {
@@ -97,7 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle login form submission
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-
         const sessionIdValue = sessionIdInput.value.trim() || generateSessionId();
         const usernameValue = usernameInput.value.trim();
 
@@ -114,12 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const formData = new FormData();
                 formData.append('avatar', avatarFile);
-
                 const response = await fetch('/upload-avatar', {
                     method: 'POST',
                     body: formData
                 });
-
                 const data = await response.json();
                 if (data.path) {
                     user.avatar = data.path;
@@ -146,12 +204,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start heartbeat
     function startHeartbeat() {
         if (heartbeatInterval) clearInterval(heartbeatInterval);
-
         heartbeatInterval = setInterval(() => {
             if (socket && socket.connected) {
                 socket.emit('heartbeat');
             }
-        }, 10000);
+        }, 30000);
     }
 
     // Create new session
@@ -164,7 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (file) {
             avatarFile = file;
-
             const reader = new FileReader();
             reader.onload = (event) => {
                 avatarPreview.innerHTML = `<img src="${event.target.result}" alt="Avatar" class="w-full h-full object-cover">`;
@@ -180,17 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const formData = new FormData();
                 formData.append('avatar', file);
-
                 const response = await fetch('/upload-avatar', {
                     method: 'POST',
                     body: formData
                 });
-
                 const data = await response.json();
                 if (data.path) {
                     user.avatar = data.path;
                     settingsAvatarPreview.innerHTML = `<img src="${data.path}" alt="Avatar" class="w-full h-full object-cover">`;
-
                     // Update avatar in the current session if already joined
                     if (socket && sessionId) {
                         socket.emit('update-avatar', {
@@ -209,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupSocketListeners() {
         socket.on('session-joined', (data) => {
             const { session, cardDecks } = data;
-
             // Update UI
             loginScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
@@ -263,7 +315,6 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('vote-count-updated', (data) => {
             const { current, total } = data;
             voteCounter.textContent = `${current}/${total} votes`;
-
             if (current === total) {
                 voteStatus.textContent = 'All votes in! Revealing results...';
             } else {
@@ -273,12 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('voting-complete', (data) => {
             const { votes, results } = data;
-
             // Update vote counter to show the correct total
             const totalVotes = Object.keys(votes).length;
             const totalConnected = Object.values(participants).filter(p => p.isConnected).length;
             voteCounter.textContent = `${totalVotes}/${totalConnected} votes`;
-
             showResults(votes, results);
         });
 
@@ -289,12 +338,10 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('deck-changed', (data) => {
             const { deckType, cards } = data;
             console.log(`Deck changed to ${deckType}`);
-
             // Update current deck type and display
             currentDeckType = deckType;
             currentDeck.textContent = deckType === 'fibonacci' ? 'Fibonacci' :
                 deckType === 'modifiedFibonacci' ? 'Modified Fibonacci' : 'T-shirt Sizes';
-
             // Load new cards
             loadCards(cards);
             resetVoting();
@@ -308,16 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
             triggerCelebration();
         });
 
-        socket.on('mini-game-started', (data) => {
-            if (data.gameType === 'reaction') {
-                miniGameModal.classList.remove('hidden');
-            }
-        });
-
-        socket.on('mini-game-result', (data) => {
-            // Handle mini-game results if needed
-        });
-
         socket.on('collision-animation', (data) => {
             const { attackerId, targetId, attackerName, targetName } = data;
             animateSmoothPunchBroadcast(attackerId, targetId, attackerName, targetName);
@@ -328,9 +365,13 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Failed to connect to the server. Please try again.');
         });
 
-        socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-            // You might want to show a reconnection UI here
+        socket.on('disconnect', (reason) => {
+            console.log('Disconnected from server:', reason);
+
+            // Only show reconnection notification for unexpected disconnections
+            if (reason !== 'io client disconnect') {
+                showReconnectNotification();
+            }
         });
     }
 
@@ -340,20 +381,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const participantIds = Object.keys(participants);
         const totalParticipants = participantIds.length;
 
-        // Dynamic radius based on number of participants
-        let radius = 220; // Default radius for 1-2 participants
-        if (totalParticipants >= 3 && totalParticipants <= 5) {
-            radius = 260; // Medium radius for 3-5 participants
-        } else if (totalParticipants >= 6 && totalParticipants <= 8) {
-            radius = 300; // Larger radius for 6-8 participants
-        } else if (totalParticipants > 8) {
-            radius = 340; // Largest radius for 9+ participants
-        }
-
         // Get the container dimensions
         const containerRect = participantsContainer.getBoundingClientRect();
         const centerX = containerRect.width / 2;
         const centerY = containerRect.height / 2;
+
+        // Dynamic radius based on number of participants and screen size
+        let radius = 180; // Default radius for 1-2 participants
+        if (totalParticipants >= 3 && totalParticipants <= 5) {
+            radius = 220; // Medium radius for 3-5 participants
+        } else if (totalParticipants >= 6 && totalParticipants <= 8) {
+            radius = 260; // Larger radius for 6-8 participants
+        } else if (totalParticipants > 8) {
+            radius = 300; // Largest radius for 9+ participants
+        }
+
+        // Adjust radius based on screen size
+        if (window.innerWidth < 640) { // Mobile
+            radius *= 0.7; // Reduce radius for mobile
+        } else if (window.innerWidth < 1024) { // Tablet
+            radius *= 0.85; // Reduce radius for tablet
+        }
 
         participantIds.forEach((id, index) => {
             const participant = participants[id];
@@ -392,14 +440,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 : `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-2xl text-gray-500"></i></div>`;
 
             participantEl.innerHTML = `
-            <div class="dbz-participant-card w-20 h-20 rounded-full overflow-hidden shadow-lg border-2 ${id === socket.id ? 'border-yellow-500' : 'border-gray-700'} pointer-events-auto">
-                ${avatarContent}
-            </div>
-            <div class="text-center mt-2 text-sm font-medium pointer-events-none">${participant.name}</div>
-            <div class="vote-indicator hidden text-center mt-1 pointer-events-none">
-                <div class="dbz-vote-card inline-block px-3 py-1 rounded-lg font-bold">?</div>
-            </div>
-        `;
+                <div class="dbz-participant-card w-20 h-20 rounded-full overflow-hidden shadow-lg border-2 ${id === socket.id ? 'border-yellow-500' : 'border-gray-700'} pointer-events-auto">
+                    ${avatarContent}
+                </div>
+                <div class="text-center mt-2 text-sm font-medium participant-name pointer-events-none">${participant.name}</div>
+                <div class="vote-indicator hidden text-center mt-1 pointer-events-none">
+                    <div class="dbz-vote-card inline-block px-3 py-1 rounded-lg font-bold">?</div>
+                </div>
+            `;
 
             participantsContainer.appendChild(participantEl);
         });
@@ -715,6 +763,101 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 900);
     }
 
+    function showReconnectNotification() {
+        // Check if notification already exists
+        const existingNotification = document.querySelector('.reconnect-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+
+        // Create a notification element
+        const notification = document.createElement('div');
+        notification.className = 'reconnect-notification fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center space-x-3';
+        notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            <span>Connection lost. Please reconnect.</span>
+        </div>
+        <button id="reconnect-btn" class="bg-white text-red-600 px-3 py-1 rounded text-sm font-medium hover:bg-gray-100 transition">
+            Reconnect
+        </button>
+    `;
+
+        document.body.appendChild(notification);
+
+        // Add event listener to the reconnect button
+        document.getElementById('reconnect-btn').addEventListener('click', () => {
+            reconnectToSession();
+            notification.remove();
+        });
+    }
+
+    function reconnectToSession() {
+        if (isReconnecting) return;
+
+        isReconnecting = true;
+
+        // Show a loading indicator
+        const reconnectBtn = document.getElementById('reconnect-btn');
+        if (reconnectBtn) {
+            reconnectBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Connecting...';
+            reconnectBtn.disabled = true;
+        }
+
+        // Create a new socket connection
+        socket = io();
+
+        // Set up socket listeners again
+        setupSocketListeners();
+
+        // Join the session again
+        socket.emit('join-session', {
+            sessionId,
+            user
+        });
+
+        // Start heartbeat again
+        startHeartbeat();
+
+        // Reset reconnection flag after a delay
+        setTimeout(() => {
+            isReconnecting = false;
+        }, 5000);
+    }
+
+    function updateConnectionStatus(status) {
+        const indicator = document.getElementById('status-indicator');
+        const text = document.getElementById('status-text');
+
+        if (!indicator || !text) return;
+
+        switch (status) {
+            case 'connected':
+                indicator.className = 'w-2 h-2 rounded-full bg-green-500 mr-1';
+                text.textContent = 'Connected';
+                break;
+            case 'disconnected':
+                indicator.className = 'w-2 h-2 rounded-full bg-red-500 mr-1';
+                text.textContent = 'Disconnected';
+                break;
+            case 'connecting':
+                indicator.className = 'w-2 h-2 rounded-full bg-yellow-500 mr-1 animate-pulse';
+                text.textContent = 'Connecting...';
+                break;
+        }
+    }
+
+    function startConnectionCheck() {
+        setInterval(() => {
+            if (socket && !socket.connected && !isReconnecting) {
+                updateConnectionStatus('disconnected');
+                showReconnectNotification();
+            }
+        }, 5000); // Check every 5 seconds
+    }
+
+    startConnectionCheck();
+
     // Load voting cards
     function loadCards(cards) {
         currentCards = cards;
@@ -722,12 +865,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         cards.forEach(card => {
             const cardEl = document.createElement('button');
-            cardEl.className = 'dbz-card-btn px-6 py-8 rounded-lg shadow-lg transform transition-all duration-200 hover:scale-105';
+            cardEl.className = 'dbz-card-btn rounded-lg shadow-lg transform transition-all duration-200';
+
+            // Add special class for longer text values
+            if (card.length > 2 || card === 'XXL' || card === 'XXXL') {
+                cardEl.classList.add('long-text');
+            }
+
             cardEl.textContent = card;
             cardEl.addEventListener('click', () => submitVote(card));
             cardsContainer.appendChild(cardEl);
         });
     }
+
+    // Add a window resize handler to update the layout when the screen size changes
+    window.addEventListener('resize', () => {
+        // Re-render participants to adjust their positions
+        if (Object.keys(participants).length > 0) {
+            renderParticipants();
+        }
+
+        // Re-load cards to adjust their sizes
+        if (currentCards.length > 0) {
+            loadCards(currentCards);
+        }
+    });
+
+    window.addEventListener('beforeunload', () => {
+        if (socket && sessionId) {
+            // Tell the server that the user is intentionally leaving the session
+            socket.emit('leave-session', sessionId);
+            socket.disconnect();
+        }
+
+        // Only clean up heartbeat interval
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+    });
 
     // Submit vote
     function submitVote(value) {
@@ -777,7 +950,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Create and display the bar chart
         createVoteChart(votes);
-
         voteStatus.textContent = 'Voting complete!';
     }
 
@@ -923,10 +1095,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const newDeckType = deckSelector.value;
         if (newDeckType !== currentDeckType && socket && sessionId) {
             console.log(`Deck changed from ${currentDeckType} to ${newDeckType}`);
-
             // Emit the change deck event to the server
             socket.emit('change-deck', { sessionId, deckType: newDeckType });
-
             // Update local deck type (will be confirmed when server responds)
             currentDeckType = newDeckType;
         }
@@ -938,7 +1108,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Apply theme - Updated to remove light mode
     function applyTheme(theme) {
         document.body.className = '';
-
         switch (theme) {
             case 'dbz':
                 document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden');
@@ -977,13 +1146,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Play sound if enabled
         if (soundEnabled) {
-            // Try to play the sound, but handle any errors
-            const playPromise = celebrationSound.play();
+            // Reset the audio to the beginning and set volume to 1
+            celebrationSound.currentTime = 0;
+            celebrationSound.volume = 1;
 
+            // Try to play the sound
+            const playPromise = celebrationSound.play();
             if (playPromise !== undefined) {
-                playPromise.catch(error => {
+                playPromise.then(() => {
+                    console.log('Celebration sound started');
+                    // Setup the fade out for the last second
+                    fadeOutAudio(celebrationSound, 1000);
+                }).catch(error => {
                     console.warn('Error playing celebration sound:', error);
-                    // Disable sound if there's an error
                     soundEnabled = false;
                 });
             }
@@ -1004,13 +1179,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.shiftKey) {
                 // Get all connected users except the current user
                 const connectedUsers = Object.values(participants).filter(p => p.isConnected && p.id !== socket.id);
-
                 if (connectedUsers.length > 0) {
                     // Select a random user
                     const randomUser = connectedUsers[Math.floor(Math.random() * connectedUsers.length)];
-
                     console.log(`Throwing emoji ${emoji} at ${randomUser.name}`);
-
                     // Send emoji to the specific user
                     socket.emit('send-emoji', {
                         sessionId,
@@ -1031,7 +1203,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show emoji reaction
     function showEmojiReaction(data) {
         const { emoji, from, to } = data;
-
         const emojiEl = document.createElement('div');
         emojiEl.className = 'absolute text-4xl animate-emoji';
 
@@ -1042,7 +1213,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (participantEl) {
                 const rect = participantEl.getBoundingClientRect();
                 const containerRect = participantsContainer.getBoundingClientRect();
-
                 emojiEl.style.left = `${rect.left - containerRect.left + rect.width / 2}px`;
                 emojiEl.style.top = `${rect.top - containerRect.top}px`;
             } else {
@@ -1074,54 +1244,524 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // Mini-games
-    reactionGameBtn.addEventListener('click', () => {
-        socket.emit('start-mini-game', { sessionId, gameType: 'reaction' });
+    // Add emoji panel toggle for mobile
+    let emojiPanelExpanded = false;
+
+    // Create a toggle button for mobile
+    const emojiToggle = document.createElement('button');
+    emojiToggle.className = 'fixed bottom-4 right-4 bg-gray-900 bg-opacity-80 rounded-full p-3 shadow-lg z-40 sm:hidden';
+    emojiToggle.innerHTML = '<i class="fas fa-smile text-yellow-500"></i>';
+    document.body.appendChild(emojiToggle);
+
+    // Toggle emoji panel on mobile
+    emojiToggle.addEventListener('click', () => {
+        emojiPanelExpanded = !emojiPanelExpanded;
+        if (emojiPanelExpanded) {
+            emojiPanel.style.maxWidth = '200px';
+            emojiPanel.style.maxHeight = '300px';
+            emojiToggle.style.transform = 'rotate(180deg)';
+        } else {
+            emojiPanel.style.maxWidth = '50px';
+            emojiPanel.style.maxHeight = '50px';
+            emojiToggle.style.transform = 'rotate(0deg)';
+        }
     });
 
-    closeMiniGame.addEventListener('click', () => {
-        miniGameModal.classList.add('hidden');
-    });
+    // Hide toggle button on larger screens
+    function checkScreenSize() {
+        if (window.innerWidth >= 640) {
+            emojiToggle.style.display = 'none';
+            emojiPanel.style.maxWidth = '';
+            emojiPanel.style.maxHeight = '';
+        } else {
+            emojiToggle.style.display = 'block';
+            if (!emojiPanelExpanded) {
+                emojiPanel.style.maxWidth = '50px';
+                emojiPanel.style.maxHeight = '50px';
+            }
+        }
+    }
 
-    startReactionGame.addEventListener('click', () => {
-        reactionGameArea.classList.remove('bg-green-500');
-        reactionGameArea.classList.add('bg-gray-800');
-        reactionInstruction.textContent = 'Get ready...';
-        reactionResult.classList.add('hidden');
+    // Check screen size on load and resize
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
 
-        // Random delay before showing the target
-        const delay = Math.random() * 3000 + 2000; // 2-5 seconds
+    // Music Player Implementation - Fixed Version
 
-        setTimeout(() => {
-            reactionGameArea.classList.remove('bg-gray-800');
-            reactionGameArea.classList.add('bg-yellow-500');
-            reactionInstruction.textContent = 'CLICK NOW!';
+    function fadeOutAudio(audio, fadeDuration = 1000) {
+        if (!audio || audio.paused) return;
 
-            const startTime = Date.now();
+        // Calculate when to start fading (1 second before the end)
+        const fadeStartTime = audio.duration - 1;
+        const currentTime = audio.currentTime;
 
-            // Set up click handler
-            const handleClick = () => {
-                const endTime = Date.now();
-                const reactionTimeMs = endTime - startTime;
+        // If we're already past the fade start time, start immediately
+        if (currentTime >= fadeStartTime) {
+            startFadeOut(audio, fadeDuration);
+        } else {
+            // Otherwise, set a timeout to start fading at the right time
+            const timeUntilFade = (fadeStartTime - currentTime) * 1000;
+            setTimeout(() => {
+                startFadeOut(audio, fadeDuration);
+            }, timeUntilFade);
+        }
+    }
 
-                reactionGameArea.classList.remove('bg-yellow-500');
-                reactionGameArea.classList.add('bg-green-500');
-                reactionInstruction.textContent = 'Nice reaction!';
+    function startFadeOut(audio, duration) {
+        const steps = 30; // Number of steps for smoother fade
+        const stepDuration = duration / steps;
+        const initialVolume = audio.volume;
+        let currentStep = 0;
 
-                reactionTime.textContent = `${reactionTimeMs}ms`;
-                reactionResult.classList.remove('hidden');
+        const fadeInterval = setInterval(() => {
+            currentStep++;
+            // Calculate new volume using linear interpolation
+            const newVolume = initialVolume * (1 - currentStep / steps);
+            audio.volume = Math.max(0, newVolume); // Ensure volume doesn't go negative
 
-                // Send result to server
-                socket.emit('mini-game-result', {
-                    sessionId,
-                    result: reactionTimeMs
+            if (currentStep >= steps) {
+                clearInterval(fadeInterval);
+            }
+        }, stepDuration);
+    }
+
+    const musicPlayer = {
+        songs: [
+            { title: "Level Up", src: "/music/Level Up.mp3", duration: "3:27" },
+            { title: "Cha-La Head-Cha-La (variations)", src: "/music/CHA-LA HEAD-CHA-LA(Variations).mp3", duration: "1:30" },
+            { title: "Skill Shop", src: "/music/Skill Shop.mp3", duration: "4:05" },
+            { title: "Dragon Arena", src: "/music/Dragon Arena.mp3", duration: "6:02" },
+            { title: "Team Saiyan (EN)", src: "/music/Team Saiyan EN.mp3", duration: "2:42" },
+        ],
+        currentSongIndex: -1,
+        audio: new Audio(),
+        isPlaying: false,
+        volume: 0.5,
+
+        init() {
+            // Set up UI elements
+            this.playerToggle = document.getElementById('music-player-toggle');
+            this.playerPanel = document.getElementById('music-player-panel');
+            this.playerClose = document.getElementById('music-player-close');
+            this.playPauseBtn = document.getElementById('play-pause-btn');
+            this.prevBtn = document.getElementById('prev-song-btn');
+            this.nextBtn = document.getElementById('next-song-btn');
+            this.volumeSlider = document.getElementById('volume-slider');
+            this.progressBar = document.getElementById('progress-bar');
+            this.currentTimeEl = document.getElementById('current-time');
+            this.totalTimeEl = document.getElementById('total-time');
+            this.currentSongNameEl = document.getElementById('current-song-name');
+            this.playlistEl = document.getElementById('playlist');
+
+            // Check if all elements exist
+            if (!this.playerToggle || !this.playerPanel || !this.playerClose ||
+                !this.playPauseBtn || !this.prevBtn || !this.nextBtn ||
+                !this.volumeSlider || !this.progressBar || !this.currentTimeEl ||
+                !this.totalTimeEl || !this.currentSongNameEl || !this.playlistEl) {
+                console.error('Music player: One or more required DOM elements not found');
+                return;
+            }
+
+            // Set initial volume
+            this.audio.volume = this.volume;
+            this.volumeSlider.value = this.volume * 100;
+
+            // Create playlist UI
+            this.createPlaylist();
+
+            // Set up event listeners
+            this.setupEventListeners();
+
+            // Set up audio event listeners
+            this.setupAudioEventListeners();
+
+            // Position the panel correctly
+            this.positionPanel();
+        },
+
+        positionPanel() {
+            // Get the button's position
+            const buttonRect = this.playerToggle.getBoundingClientRect();
+
+            // Get the panel's width
+            const panelWidth = 320; // Panel width in pixels
+
+            // Calculate the center position
+            const buttonCenterX = buttonRect.left + (buttonRect.width / 2);
+            const panelLeft = buttonCenterX - (panelWidth / 2);
+
+            // Set the panel position to be below the button and centered horizontally
+            this.playerPanel.style.top = `${buttonRect.bottom + window.scrollY + 8}px`; // 8px gap, adjusted for scroll
+            this.playerPanel.style.left = `${panelLeft + window.scrollX}px`;
+            this.playerPanel.style.right = 'auto'; // Reset right positioning
+
+            // Adjust if panel goes off-screen on the left
+            if (panelLeft < 0) {
+                this.playerPanel.style.left = `${window.scrollX}px`;
+            }
+
+            // Adjust if panel goes off-screen on the right
+            if (panelLeft + panelWidth > window.innerWidth) {
+                this.playerPanel.style.left = `${window.innerWidth + window.scrollX - panelWidth}px`;
+            }
+        },
+
+        setupEventListeners() {
+            // Toggle music player panel
+            this.playerToggle.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling
+                this.playerPanel.classList.toggle('hidden');
+                if (!this.playerPanel.classList.contains('hidden')) {
+                    // Reposition the panel each time it's opened
+                    this.positionPanel();
+                }
+            });
+
+            // Close music player panel
+            this.playerClose.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling
+                this.playerPanel.classList.add('hidden');
+            });
+
+            // Play/Pause button
+            this.playPauseBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling
+                this.togglePlayPause();
+            });
+
+            // Previous song button
+            this.prevBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling
+                this.playPreviousSong();
+            });
+
+            // Next song button
+            this.nextBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling
+                this.playNextSong();
+            });
+
+            // Volume slider
+            this.volumeSlider.addEventListener('input', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling
+                this.setVolume(e.target.value / 100);
+            });
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                if (!this.playerPanel.classList.contains('hidden')) {
+                    this.positionPanel();
+                }
+            });
+
+            // Close the panel when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!this.playerPanel.classList.contains('hidden') &&
+                    !this.playerPanel.contains(e.target) &&
+                    !this.playerToggle.contains(e.target)) {
+                    this.playerPanel.classList.add('hidden');
+                }
+            });
+
+            // Prevent clicks inside the panel from bubbling up
+            this.playerPanel.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent clicks inside the panel from reaching the document
+            });
+        },
+
+        setupAudioEventListeners() {
+            // Update progress bar as song plays
+            this.audio.addEventListener('timeupdate', () => {
+                if (this.audio.duration) {
+                    const progress = (this.audio.currentTime / this.audio.duration) * 100;
+                    this.progressBar.style.width = `${progress}%`;
+                    this.currentTimeEl.textContent = this.formatTime(this.audio.currentTime);
+                }
+            });
+
+            // When song ends, play next song
+            this.audio.addEventListener('ended', () => {
+                this.playNextSong();
+            });
+
+            // When metadata is loaded, update total time
+            this.audio.addEventListener('loadedmetadata', () => {
+                this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
+            });
+
+            // Handle audio errors
+            this.audio.addEventListener('error', (e) => {
+                console.error('Audio error:', e);
+                this.isPlaying = false;
+                this.updatePlayPauseButton();
+
+                if (this.currentSongIndex !== -1) {
+                    const song = this.songs[this.currentSongIndex];
+                    this.showErrorMessage(`Error playing: ${song.title}`);
+                }
+            });
+        },
+
+        createPlaylist() {
+            this.playlistEl.innerHTML = '';
+
+            this.songs.forEach((song, index) => {
+                const playlistItem = document.createElement('div');
+                playlistItem.className = 'playlist-item';
+                playlistItem.dataset.index = index;
+
+                playlistItem.innerHTML = `
+                <div class="playlist-item-title">${song.title}</div>
+                <div class="playlist-item-duration">${song.duration}</div>
+            `;
+
+                // Add click event listener with stopPropagation
+                playlistItem.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent event from bubbling
+                    this.playSong(index);
                 });
 
-                // Remove click handler
-                reactionGameArea.removeEventListener('click', handleClick);
+                this.playlistEl.appendChild(playlistItem);
+            });
+        },
+
+        showErrorMessage(message) {
+            // Create a temporary error message
+            const errorEl = document.createElement('div');
+            errorEl.className = 'music-player-error absolute top-2 left-0 right-0 bg-red-600 text-white text-center py-1 px-2 rounded text-sm z-50';
+            errorEl.textContent = message;
+            this.playerPanel.appendChild(errorEl);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                errorEl.remove();
+            }, 3000);
+        },
+
+        playSong(index) {
+            console.log(`Playing song at index: ${index}`);
+            if (index < 0 || index >= this.songs.length) {
+                console.error('Invalid song index:', index);
+                return;
+            }
+
+            this.currentSongIndex = index;
+            const song = this.songs[index];
+            console.log(`Selected song:`, song);
+
+            // Update UI with loading indicator
+            this.currentSongNameEl.innerHTML = `${song.title} <span class="loading-indicator"></span>`;
+            this.updatePlaylistActiveItem();
+
+            // Reset progress bar
+            this.progressBar.style.width = '0%';
+            this.currentTimeEl.textContent = '0:00';
+
+            // Load and play the song
+            this.audio.src = song.src;
+            console.log(`Loading audio from: ${song.src}`);
+            this.audio.load();
+
+            // Remove loading indicator when playback starts or fails
+            const removeLoadingIndicator = () => {
+                this.currentSongNameEl.innerHTML = song.title;
             };
 
-            reactionGameArea.addEventListener('click', handleClick);
-        }, delay);
+            // Set up one-time event listeners for loading indicator
+            this.audio.addEventListener('play', removeLoadingIndicator, { once: true });
+            this.audio.addEventListener('error', removeLoadingIndicator, { once: true });
+
+            // Set up error handling
+            this.audio.onerror = () => {
+                console.error('Error loading audio file:', song.src);
+                this.isPlaying = false;
+                this.updatePlayPauseButton();
+
+                // Show error message to user
+                this.showErrorMessage(`Error loading: ${song.title}`);
+            };
+
+            const playPromise = this.audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('Playback started successfully');
+                    this.isPlaying = true;
+                    this.updatePlayPauseButton();
+                }).catch(error => {
+                    console.error('Error playing song:', error);
+                    this.isPlaying = false;
+                    this.updatePlayPauseButton();
+
+                    // Show error message to user
+                    this.showErrorMessage(`Playback error: ${song.title}`);
+                });
+            }
+        },
+
+        togglePlayPause() {
+            console.log('Toggle play/pause. Current state:', this.isPlaying);
+            if (this.currentSongIndex === -1) {
+                console.log('No song selected, playing first song');
+                this.playSong(0);
+                return;
+            }
+
+            if (this.isPlaying) {
+                console.log('Pausing playback');
+                this.audio.pause();
+                this.isPlaying = false;
+            } else {
+                console.log('Resuming playback');
+                const playPromise = this.audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('Playback resumed successfully');
+                        this.isPlaying = true;
+                    }).catch(error => {
+                        console.error('Error resuming playback:', error);
+                        this.isPlaying = false;
+                    });
+                }
+            }
+
+            this.updatePlayPauseButton();
+        },
+
+        playPreviousSong() {
+            if (this.currentSongIndex <= 0) {
+                this.playSong(this.songs.length - 1);
+            } else {
+                this.playSong(this.currentSongIndex - 1);
+            }
+        },
+
+        playNextSong() {
+            if (this.currentSongIndex === -1) {
+                this.playSong(0);
+            } else if (this.currentSongIndex >= this.songs.length - 1) {
+                this.playSong(0); // Loop back to first song
+            } else {
+                this.playSong(this.currentSongIndex + 1);
+            }
+        },
+
+        setVolume(volume) {
+            this.volume = volume;
+            this.audio.volume = volume;
+            this.volumeSlider.value = volume * 100;
+        },
+
+        updatePlayPauseButton() {
+            if (this.isPlaying) {
+                this.playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            } else {
+                this.playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            }
+        },
+
+        updatePlaylistActiveItem() {
+            const items = this.playlistEl.querySelectorAll('.playlist-item');
+            items.forEach((item, index) => {
+                if (index === this.currentSongIndex) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        },
+
+        formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+        }
+    };
+
+    // Animate the message panel when page loads
+    const messagePanel = document.getElementById('mini-games-panel');
+    if (messagePanel) {
+        // Add a small delay before starting the animation
+        setTimeout(() => {
+            messagePanel.classList.add('animate-in');
+        }, 500);
+    }
+
+    // Add click effect to the message
+    if (messagePanel) {
+        messagePanel.addEventListener('click', function (e) {
+            e.preventDefault(); // Prevent default link behavior
+
+            // Create ripple effect
+            const ripple = document.createElement('span');
+            ripple.classList.add('ripple');
+
+            // Calculate ripple position
+            const rect = this.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const x = e.clientX - rect.left - size / 2;
+            const y = e.clientY - rect.top - size / 2;
+
+            // Set ripple styles
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+
+            // Add ripple to the element
+            this.appendChild(ripple);
+
+            // Remove ripple after animation completes
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+
+            // Add a small delay before redirecting for better UX
+            setTimeout(() => {
+                // Add a fade-out effect
+                this.style.transition = 'all 0.3s ease';
+                this.style.opacity = '0';
+                this.style.transform = 'translateX(-20px)';
+
+                // Redirect after fade-out
+                setTimeout(() => {
+                    window.open('https://linkedin.com/in/gabbosaur', '_blank');
+
+                    // Reset the panel for next time
+                    setTimeout(() => {
+                        this.style.transition = '';
+                        this.style.opacity = '';
+                        this.style.transform = '';
+                        this.classList.remove('animate-in');
+                    }, 1000);
+                }, 300);
+            }, 200);
+        });
+    }
+
+    // Add this function to your main.js
+    function animateMessagePanel() {
+        const messagePanel = document.getElementById('mini-games-panel');
+        if (messagePanel) {
+            // Reset any existing animation
+            messagePanel.classList.remove('animate-in');
+
+            // Force a reflow to reset the animation
+            void messagePanel.offsetWidth;
+
+            // Start the animation
+            messagePanel.classList.add('animate-in');
+        }
+    }
+
+    // You can call this function whenever you want to re-animate the panel
+    // For example, after the user returns from LinkedIn:
+    window.addEventListener('focus', () => {
+        // Check if the panel is visible
+        const messagePanel = document.getElementById('mini-games-panel');
+        if (messagePanel && !messagePanel.classList.contains('hidden')) {
+            animateMessagePanel();
+        }
     });
+
+    // Initialize the music player
+    musicPlayer.init();
 });

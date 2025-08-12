@@ -306,28 +306,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle mini-game start
-    socket.on('start-mini-game', (data) => {
-        const { sessionId, gameType } = data;
-
-        if (sessions[sessionId]) {
-            sessions[sessionId].gameActive = true;
-            io.to(sessionId).emit('mini-game-started', { gameType });
-        }
-    });
-
-    // Handle mini-game result
-    socket.on('mini-game-result', (data) => {
-        const { sessionId, result } = data;
-
-        if (sessions[sessionId]) {
-            io.to(sessionId).emit('mini-game-result', {
-                user: sessions[sessionId].users[socket.id],
-                result
-            });
-        }
-    });
-
     // Handle avatar update
     socket.on('update-avatar', (data) => {
         const { sessionId, avatarPath } = data;
