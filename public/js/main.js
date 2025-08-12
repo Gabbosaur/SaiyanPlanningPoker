@@ -41,6 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const reactionInstruction = document.getElementById('reaction-instruction');
     const reactionResult = document.getElementById('reaction-result');
     const reactionTime = document.getElementById('reaction-time');
+    const punchSound = document.getElementById('punch-sound'); // New element
+    const collisionOverlay = document.getElementById('collision-overlay');
+    const collisionContainer = document.getElementById('collision-container');
+
 
     // App State
     let sessionId = '';
@@ -58,10 +62,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let socket = null;
     let avatarFile = null;
     let heartbeatInterval = null;
+    let isAnimating = false; // Track if collision animation is in progress
+
 
     // Audio for celebration with error handling
     const celebrationSound = new Audio('/sounds/super-saiyan.mp3');
 
+    
     // Handle audio loading errors
     celebrationSound.addEventListener('error', (e) => {
         console.warn('Error loading celebration sound:', e);
@@ -69,8 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
         soundEnabled = false;
     });
 
-    // Preload the audio file
+    // Handle punch sound loading errors
+    punchSound.addEventListener('error', (e) => {
+        console.warn('Error loading punch sound:', e);
+    });
+
+    // Preload the audio files
     celebrationSound.load();
+    punchSound.load();
 
     // Generate a random session ID
     function generateSessionId() {
@@ -309,6 +322,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Handle mini-game results if needed
         });
 
+        // New listener for collision animation
+        socket.on('collision-animation', (data) => {
+            const { attackerId, targetId, attackerName, targetName } = data;
+            animateCollisionBroadcast(attackerId, targetId, attackerName, targetName);
+        });
+
+
         socket.on('connect_error', (error) => {
             console.error('Connection error:', error);
             alert('Failed to connect to the server. Please try again.');
@@ -321,6 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Render participants around the table
+    // Render participants around the table (update to add collision event)
     function renderParticipants() {
         participantsContainer.innerHTML = '';
 
@@ -341,6 +362,24 @@ document.addEventListener('DOMContentLoaded', () => {
             participantEl.style.top = `calc(50% + ${y}px)`;
             participantEl.setAttribute('data-user-id', id);
 
+            // Add click event for collision animation (only for other users)
+            if (id !== socket.id) {
+                participantEl.style.cursor = 'pointer';
+                participantEl.addEventListener('click', () => {
+                    if (!isAnimating) {
+                        // Emit collision event to server
+                        socket.emit('user-collision', {
+                            sessionId,
+                            attackerId: socket.id,
+                            targetId: id
+                        });
+
+                        // Start local animation immediately for better responsiveness
+                        animateCollision(socket.id, id);
+                    }
+                });
+            }
+
             const avatarContent = participant.avatar
                 ? `<img src="${participant.avatar}" alt="${participant.name}" class="w-full h-full object-cover">`
                 : `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-2xl text-gray-500"></i></div>`;
@@ -357,6 +396,308 @@ document.addEventListener('DOMContentLoaded', () => {
 
             participantsContainer.appendChild(participantEl);
         });
+    }
+
+    // Enhanced function to animate collision between users (local)
+    function animateCollision(attackerId, targetId) {
+        if (isAnimating) return;
+
+        isAnimating = true;
+
+        const attackerEl = document.querySelector(`[data-user-id="${attackerId}"]`);
+        const targetEl = document.querySelector(`[data-user-id="${targetId}"]`);
+
+        if (!attackerEl || !targetEl) {
+            isAnimating = false;
+            return;
+        }
+
+        // Get positions
+        const containerRect = participantsContainer.getBoundingClientRect();
+        const attackerRect = attackerEl.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+
+        // Calculate positions relative to container
+        const startX = attackerRect.left - containerRect.left + attackerRect.width / 2;
+        const startY = attackerRect.top - containerRect.top + attackerRect.height / 2;
+        const targetX = targetRect.left - containerRect.left + targetRect.width / 2;
+        const targetY = targetRect.top - containerRect.top + targetRect.height / 2;
+
+        // Set CSS variables for animation
+        attackerEl.style.setProperty('--start-x', '0px');
+        attackerEl.style.setProperty('--start-y', '0px');
+        attackerEl.style.setProperty('--target-x', `${targetX - startX}px`);
+        attackerEl.style.setProperty('--target-y', `${targetY - startY}px`);
+
+        // Add animation class
+        attackerEl.classList.add('animate-collision');
+
+        // Play punch sound if enabled
+        if (soundEnabled) {
+            const playPromise = punchSound.cloneNode(true).play();
+
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.warn('Error playing punch sound:', error);
+                });
+            }
+        }
+
+        // Create screen flash effect
+        const screenFlash = document.createElement('div');
+        screenFlash.className = 'screen-flash';
+        document.body.appendChild(screenFlash);
+
+        // Remove screen flash after animation
+        setTimeout(() => {
+            screenFlash.remove();
+        }, 200);
+
+        // Create collision effect at target position
+        setTimeout(() => {
+            const effect = document.createElement('div');
+            effect.className = 'collision-effect';
+            effect.style.left = `${targetX - 40}px`;
+            effect.style.top = `${targetY - 40}px`;
+            participantsContainer.appendChild(effect);
+
+            // Add shake animation to target
+            targetEl.classList.add('animate-shake');
+
+            // Create impact particles
+            createImpactParticles(targetX, targetY);
+
+            // Create collision text
+            const collisionText = document.createElement('div');
+            collisionText.className = 'collision-text';
+            collisionText.textContent = 'POW!';
+            collisionText.style.left = `${targetX}px`;
+            collisionText.style.top = `${targetY - 40}px`;
+            participantsContainer.appendChild(collisionText);
+
+            // Remove effect after animation completes
+            setTimeout(() => {
+                effect.remove();
+                targetEl.classList.remove('animate-shake');
+                collisionText.remove();
+            }, 600);
+        }, 600); // Timing to match the collision animation (60% of 1s)
+
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            attackerEl.classList.remove('animate-collision');
+            isAnimating = false;
+        }, 1000);
+    }
+
+    // New function to animate collision broadcast from other users
+    function animateCollisionBroadcast(attackerId, targetId, attackerName, targetName) {
+        if (isAnimating) return;
+
+        isAnimating = true;
+
+        const attackerEl = document.querySelector(`[data-user-id="${attackerId}"]`);
+        const targetEl = document.querySelector(`[data-user-id="${targetId}"]`);
+
+        if (!attackerEl || !targetEl) {
+            isAnimating = false;
+            return;
+        }
+
+        // Get positions
+        const containerRect = participantsContainer.getBoundingClientRect();
+        const attackerRect = attackerEl.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+
+        // Calculate positions relative to container
+        const startX = attackerRect.left - containerRect.left + attackerRect.width / 2;
+        const startY = attackerRect.top - containerRect.top + attackerRect.height / 2;
+        const targetX = targetRect.left - containerRect.left + targetRect.width / 2;
+        const targetY = targetRect.top - containerRect.top + targetRect.height / 2;
+
+        // Set CSS variables for animation
+        attackerEl.style.setProperty('--start-x', '0px');
+        attackerEl.style.setProperty('--start-y', '0px');
+        attackerEl.style.setProperty('--target-x', `${targetX - startX}px`);
+        attackerEl.style.setProperty('--target-y', `${targetY - startY}px`);
+
+        // Add animation class
+        attackerEl.classList.add('animate-collision');
+
+        // Play punch sound if enabled
+        if (soundEnabled) {
+            const playPromise = punchSound.cloneNode(true).play();
+
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.warn('Error playing punch sound:', error);
+                });
+            }
+        }
+
+        // Create screen flash effect
+        const screenFlash = document.createElement('div');
+        screenFlash.className = 'screen-flash';
+        document.body.appendChild(screenFlash);
+
+        // Remove screen flash after animation
+        setTimeout(() => {
+            screenFlash.remove();
+        }, 200);
+
+        // Show collision overlay with attacker and target names
+        collisionOverlay.classList.remove('hidden');
+
+        // Create collision text with names
+        const collisionText = document.createElement('div');
+        collisionText.className = 'collision-text';
+        collisionText.textContent = `${attackerName} hits ${targetName}!`;
+        collisionText.style.left = '50%';
+        collisionText.style.top = '30%';
+        collisionText.style.transform = 'translateX(-50%)';
+        collisionText.style.fontSize = '1.5rem';
+        collisionContainer.appendChild(collisionText);
+
+        // Create collision effect at target position
+        setTimeout(() => {
+            const effect = document.createElement('div');
+            effect.className = 'collision-effect';
+            effect.style.left = `${targetX - 40}px`;
+            effect.style.top = `${targetY - 40}px`;
+            participantsContainer.appendChild(effect);
+
+            // Add shake animation to target
+            targetEl.classList.add('animate-shake');
+
+            // Create impact particles
+            createImpactParticles(targetX, targetY);
+
+            // Create POW text
+            const powText = document.createElement('div');
+            powText.className = 'collision-text';
+            powText.textContent = 'POW!';
+            powText.style.left = `${targetX}px`;
+            powText.style.top = `${targetY - 40}px`;
+            participantsContainer.appendChild(powText);
+
+            // Remove effect after animation completes
+            setTimeout(() => {
+                effect.remove();
+                targetEl.classList.remove('animate-shake');
+                powText.remove();
+            }, 600);
+        }, 600); // Timing to match the collision animation (60% of 1s)
+
+        // Remove animation class and hide overlay after animation completes
+        setTimeout(() => {
+            attackerEl.classList.remove('animate-collision');
+            collisionText.remove();
+            collisionOverlay.classList.add('hidden');
+            isAnimating = false;
+        }, 1000);
+    }
+
+    // New function to create impact particles
+    function createImpactParticles(x, y) {
+        const particleCount = 12;
+
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'impact-particle';
+
+            // Random direction for each particle
+            const angle = (i / particleCount) * Math.PI * 2;
+            const distance = 50 + Math.random() * 50;
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+
+            particle.style.setProperty('--tx', `${tx}px`);
+            particle.style.setProperty('--ty', `${ty}px`);
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+
+            // Random color variations
+            const colors = ['#ffffff', '#ff9500', '#ff8c00', '#ffd700'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            particle.style.background = `radial-gradient(circle, ${randomColor} 0%, rgba(255,149,0,0.5) 100%)`;
+
+            participantsContainer.appendChild(particle);
+
+            // Remove particle after animation completes
+            setTimeout(() => {
+                particle.remove();
+            }, 800);
+        }
+    }
+
+    // New function to animate collision between users
+    function animateCollision(attackerId, targetId) {
+        if (isAnimating) return;
+
+        isAnimating = true;
+
+        const attackerEl = document.querySelector(`[data-user-id="${attackerId}"]`);
+        const targetEl = document.querySelector(`[data-user-id="${targetId}"]`);
+
+        if (!attackerEl || !targetEl) {
+            isAnimating = false;
+            return;
+        }
+
+        // Get positions
+        const containerRect = participantsContainer.getBoundingClientRect();
+        const attackerRect = attackerEl.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+
+        // Calculate positions relative to container
+        const startX = attackerRect.left - containerRect.left + attackerRect.width / 2;
+        const startY = attackerRect.top - containerRect.top + attackerRect.height / 2;
+        const targetX = targetRect.left - containerRect.left + targetRect.width / 2;
+        const targetY = targetRect.top - containerRect.top + targetRect.height / 2;
+
+        // Set CSS variables for animation
+        attackerEl.style.setProperty('--start-x', '0px');
+        attackerEl.style.setProperty('--start-y', '0px');
+        attackerEl.style.setProperty('--target-x', `${targetX - startX}px`);
+        attackerEl.style.setProperty('--target-y', `${targetY - startY}px`);
+
+        // Add animation class
+        attackerEl.classList.add('animate-collision');
+
+        // Play punch sound if enabled
+        if (soundEnabled) {
+            const playPromise = punchSound.cloneNode(true).play();
+
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.warn('Error playing punch sound:', error);
+                });
+            }
+        }
+
+        // Create collision effect at target position
+        setTimeout(() => {
+            const effect = document.createElement('div');
+            effect.className = 'collision-effect';
+            effect.style.left = `${targetX - 30}px`;
+            effect.style.top = `${targetY - 30}px`;
+            participantsContainer.appendChild(effect);
+
+            // Add shake animation to target
+            targetEl.classList.add('animate-shake');
+
+            // Remove effect after animation completes
+            setTimeout(() => {
+                effect.remove();
+                targetEl.classList.remove('animate-shake');
+            }, 500);
+        }, 560); // Timing to match the collision animation (70% of 0.8s)
+
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            attackerEl.classList.remove('animate-collision');
+            isAnimating = false;
+        }, 800);
     }
 
     // Load voting cards

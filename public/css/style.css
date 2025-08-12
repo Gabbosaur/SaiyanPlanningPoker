@@ -67,9 +67,17 @@
 }
 
 @keyframes border-pulse {
-    0% { opacity: 0.5; }
-    50% { opacity: 0.8; }
-    100% { opacity: 0.5; }
+    0% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+
+    100% {
+        opacity: 0.5;
+    }
 }
 
 .dbz-participant-card {
@@ -164,6 +172,7 @@
         transform: translateY(0) scale(1);
         opacity: 1;
     }
+
     100% {
         transform: translateY(-100px) scale(1.5);
         opacity: 0;
@@ -225,6 +234,7 @@
         height: 0;
         opacity: 1;
     }
+
     100% {
         width: 100vmax;
         height: 100vmax;
@@ -250,22 +260,27 @@
         transform: scale(0.8) rotate(0deg);
         filter: brightness(1) saturate(1);
     }
+
     20% {
         transform: scale(1.2) rotate(5deg);
         filter: brightness(1.5) saturate(1.5);
     }
+
     40% {
         transform: scale(0.9) rotate(-5deg);
         filter: brightness(2) saturate(2);
     }
+
     60% {
         transform: scale(1.1) rotate(3deg);
         filter: brightness(2.5) saturate(2.5);
     }
+
     80% {
         transform: scale(0.95) rotate(-2deg);
         filter: brightness(3) saturate(3);
     }
+
     100% {
         transform: scale(1) rotate(0deg);
         filter: brightness(3.5) saturate(3.5);
@@ -282,9 +297,11 @@
         transform: translate(0, 0);
         opacity: 0;
     }
+
     20% {
         opacity: 1;
     }
+
     100% {
         transform: translate(var(--tx), var(--ty));
         opacity: 0;
@@ -299,12 +316,29 @@
 }
 
 /* Set random values for each particle */
-.energy-particle:nth-child(1) { --seed: 0.1; }
-.energy-particle:nth-child(2) { --seed: 0.2; }
-.energy-particle:nth-child(3) { --seed: 0.3; }
-.energy-particle:nth-child(4) { --seed: 0.4; }
-.energy-particle:nth-child(5) { --seed: 0.5; }
-.energy-particle:nth-child(6) { --seed: 0.6; }
+.energy-particle:nth-child(1) {
+    --seed: 0.1;
+}
+
+.energy-particle:nth-child(2) {
+    --seed: 0.2;
+}
+
+.energy-particle:nth-child(3) {
+    --seed: 0.3;
+}
+
+.energy-particle:nth-child(4) {
+    --seed: 0.4;
+}
+
+.energy-particle:nth-child(5) {
+    --seed: 0.5;
+}
+
+.energy-particle:nth-child(6) {
+    --seed: 0.6;
+}
 
 /* Celebration text animation */
 @keyframes pulse-glow {
@@ -312,10 +346,12 @@
         text-shadow: 0 0 5px rgba(249, 215, 28, 0.5);
         transform: scale(1);
     }
+
     50% {
         text-shadow: 0 0 20px rgba(249, 215, 28, 0.8), 0 0 30px rgba(255, 149, 0, 0.6);
         transform: scale(1.05);
     }
+
     100% {
         text-shadow: 0 0 5px rgba(249, 215, 28, 0.5);
         transform: scale(1);
@@ -332,36 +368,305 @@
         width: 300px;
         height: 300px;
     }
-    
+
     .dbz-participant-card {
         width: 16;
         height: 16;
     }
-    
+
     .dbz-card-btn {
         padding: 1rem;
         font-size: 1.2rem;
     }
-    
+
     .vote-bar-container {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .vote-label {
         width: 100%;
         text-align: center;
         padding-right: 0;
         padding-bottom: 4px;
     }
-    
+
     .vote-count {
         width: 100%;
         text-align: center;
         padding-left: 0;
         padding-top: 4px;
     }
-    
+
+    #celebration-text {
+        font-size: 2.5rem;
+    }
+}
+
+/* Replace the existing collision animation styles with these improved versions */
+
+/* Collision animation - Enhanced */
+@keyframes move-to-target {
+    0% {
+        transform: translate(var(--start-x), var(--start-y)) scale(1) rotate(0deg);
+        filter: brightness(1) drop-shadow(0 0 0px rgba(255, 215, 0, 0));
+    }
+
+    30% {
+        transform: translate(calc(var(--target-x) * 0.5), calc(var(--target-y) * 0.5)) scale(1.1) rotate(10deg);
+        filter: brightness(1.2) drop-shadow(0 0 10px rgba(255, 215, 0, 0.7));
+    }
+
+    60% {
+        transform: translate(var(--target-x), var(--target-y)) scale(1.3) rotate(0deg);
+        filter: brightness(1.5) drop-shadow(0 0 20px rgba(255, 140, 0, 0.9));
+    }
+
+    70% {
+        transform: translate(var(--target-x), var(--target-y)) scale(0.9) rotate(-5deg);
+        filter: brightness(2) drop-shadow(0 0 30px rgba(255, 69, 0, 1));
+    }
+
+    85% {
+        transform: translate(calc(var(--target-x) * 0.5), calc(var(--target-y) * 0.5)) scale(1.1) rotate(5deg);
+        filter: brightness(1.2) drop-shadow(0 0 10px rgba(255, 215, 0, 0.7));
+    }
+
+    100% {
+        transform: translate(var(--start-x), var(--start-y)) scale(1) rotate(0deg);
+        filter: brightness(1) drop-shadow(0 0 0px rgba(255, 215, 0, 0));
+    }
+}
+
+.animate-collision {
+    animation: move-to-target 1s ease-in-out forwards;
+    z-index: 100;
+}
+
+/* Enhanced collision effect */
+@keyframes collision-effect {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    }
+
+    50% {
+        transform: scale(1.5);
+        opacity: 0.8;
+        box-shadow: 0 0 30px 10px rgba(255, 215, 0, 0.7);
+    }
+
+    100% {
+        transform: scale(3);
+        opacity: 0;
+        box-shadow: 0 0 0 0 rgba(255, 140, 0, 0);
+    }
+}
+
+.collision-effect {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 215, 0, 0.8) 30%, rgba(255, 140, 0, 0.6) 60%, rgba(255, 69, 0, 0) 100%);
+    animation: collision-effect 0.6s ease-out forwards;
+    pointer-events: none;
+    z-index: 101;
+}
+
+/* Enhanced shake animation for target */
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0) rotate(0deg);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translateX(-8px) rotate(-2deg);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translateX(8px) rotate(2deg);
+    }
+}
+
+.animate-shake {
+    animation: shake 0.6s ease-in-out;
+}
+
+/* Impact particles */
+@keyframes impact-particle {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(var(--tx), var(--ty)) scale(0);
+        opacity: 0;
+    }
+}
+
+.impact-particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #ff9500 100%);
+    animation: impact-particle 0.8s ease-out forwards;
+    pointer-events: none;
+    z-index: 102;
+}
+
+/* Collision text effect */
+@keyframes collision-text {
+    0% {
+        transform: translateY(0) scale(0.5);
+        opacity: 0;
+        text-shadow: 0 0 5px rgba(255, 215, 0, 0.8);
+    }
+
+    50% {
+        transform: translateY(-20px) scale(1.2);
+        opacity: 1;
+        text-shadow: 0 0 15px rgba(255, 215, 0, 1);
+    }
+
+    100% {
+        transform: translateY(-40px) scale(0.8);
+        opacity: 0;
+        text-shadow: 0 0 5px rgba(255, 215, 0, 0.8);
+    }
+}
+
+.collision-text {
+    position: absolute;
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: #ff9500;
+    text-transform: uppercase;
+    animation: collision-text 1s ease-out forwards;
+    pointer-events: none;
+    z-index: 103;
+}
+
+/* Screen flash effect */
+@keyframes screen-flash {
+    0% {
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+.screen-flash {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: white;
+    pointer-events: none;
+    z-index: 90;
+    animation: screen-flash 0.2s ease-out forwards;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dbz-table {
+        width: 300px;
+        height: 300px;
+    }
+
+    .dbz-participant-card {
+        width: 16;
+        height: 16;
+    }
+
+    .dbz-card-btn {
+        padding: 1rem;
+        font-size: 1.2rem;
+    }
+
+    .vote-bar-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .vote-label {
+        width: 100%;
+        text-align: center;
+        padding-right: 0;
+        padding-bottom: 4px;
+    }
+
+    .vote-count {
+        width: 100%;
+        text-align: center;
+        padding-left: 0;
+        padding-top: 4px;
+    }
+
+    #celebration-text {
+        font-size: 2.5rem;
+    }
+
+    .collision-text {
+        font-size: 1rem;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dbz-table {
+        width: 300px;
+        height: 300px;
+    }
+
+    .dbz-participant-card {
+        width: 16;
+        height: 16;
+    }
+
+    .dbz-card-btn {
+        padding: 1rem;
+        font-size: 1.2rem;
+    }
+
+    .vote-bar-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .vote-label {
+        width: 100%;
+        text-align: center;
+        padding-right: 0;
+        padding-bottom: 4px;
+    }
+
+    .vote-count {
+        width: 100%;
+        text-align: center;
+        padding-left: 0;
+        padding-top: 4px;
+    }
+
     #celebration-text {
         font-size: 2.5rem;
     }

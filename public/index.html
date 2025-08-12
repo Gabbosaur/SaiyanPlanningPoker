@@ -11,6 +11,7 @@
 </head>
 
 <body class="dbz-bg min-h-screen text-white overflow-hidden">
+    <audio id="punch-sound" src="/sounds/punch.mp3" preload="auto"></audio>
     <!-- Login Screen -->
     <div id="login-screen" class="flex items-center justify-center min-h-screen">
         <div class="dbz-card p-8 rounded-xl shadow-2xl w-full max-w-md">
@@ -253,6 +254,14 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Add this after the celebration overlay -->
+        <!-- Collision Animation Overlay -->
+        <div id="collision-overlay" class="hidden fixed inset-0 pointer-events-none z-40">
+            <div id="collision-container" class="relative w-full h-full">
+                <!-- Collision effects will be dynamically inserted here -->
             </div>
         </div>
 
