@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsAvatarUpload = document.getElementById('settings-avatar-upload');
     const settingsAvatarPreview = document.getElementById('settings-avatar-preview');
     const celebrationOverlay = document.getElementById('celebration-overlay');
+    const collisionOverlay = document.getElementById('collision-overlay');
+    const collisionContainer = document.getElementById('collision-container');
     const emojiPanel = document.getElementById('emoji-panel');
     const emojiContainer = document.getElementById('emoji-container');
     const miniGamesPanel = document.getElementById('mini-games-panel');
@@ -41,10 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const reactionInstruction = document.getElementById('reaction-instruction');
     const reactionResult = document.getElementById('reaction-result');
     const reactionTime = document.getElementById('reaction-time');
-    const punchSound = document.getElementById('punch-sound'); // New element
-    const collisionOverlay = document.getElementById('collision-overlay');
-    const collisionContainer = document.getElementById('collision-container');
-
+    const punchSound = document.getElementById('punch-sound');
 
     // App State
     let sessionId = '';
@@ -57,22 +56,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentCards = [];
     let hasVoted = false;
     let soundEnabled = true;
-    let currentTheme = 'dbz'; // Default to DBZ theme
+    let currentTheme = 'dbz';
     let currentDeckType = 'modifiedFibonacci';
     let socket = null;
     let avatarFile = null;
     let heartbeatInterval = null;
-    let isAnimating = false; // Track if collision animation is in progress
-
+    let isAnimating = false;
 
     // Audio for celebration with error handling
     const celebrationSound = new Audio('/sounds/super-saiyan.mp3');
 
-    
     // Handle audio loading errors
     celebrationSound.addEventListener('error', (e) => {
         console.warn('Error loading celebration sound:', e);
-        // Disable sound if there's an error
         soundEnabled = false;
     });
 
@@ -322,12 +318,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Handle mini-game results if needed
         });
 
-        // New listener for collision animation
         socket.on('collision-animation', (data) => {
             const { attackerId, targetId, attackerName, targetName } = data;
-            animateCollisionBroadcast(attackerId, targetId, attackerName, targetName);
+            animateSmoothPunchBroadcast(attackerId, targetId, attackerName, targetName);
         });
-
 
         socket.on('connect_error', (error) => {
             console.error('Connection error:', error);
@@ -341,31 +335,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Render participants around the table
-    // Render participants around the table (update to add collision event)
     function renderParticipants() {
         participantsContainer.innerHTML = '';
-
         const participantIds = Object.keys(participants);
         const totalParticipants = participantIds.length;
+
+        // Dynamic radius based on number of participants
+        let radius = 220; // Default radius for 1-2 participants
+        if (totalParticipants >= 3 && totalParticipants <= 5) {
+            radius = 260; // Medium radius for 3-5 participants
+        } else if (totalParticipants >= 6 && totalParticipants <= 8) {
+            radius = 300; // Larger radius for 6-8 participants
+        } else if (totalParticipants > 8) {
+            radius = 340; // Largest radius for 9+ participants
+        }
+
+        // Get the container dimensions
+        const containerRect = participantsContainer.getBoundingClientRect();
+        const centerX = containerRect.width / 2;
+        const centerY = containerRect.height / 2;
 
         participantIds.forEach((id, index) => {
             const participant = participants[id];
             const angle = (index / totalParticipants) * 2 * Math.PI;
-            const radius = 220; // Distance from center
-
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
 
             const participantEl = document.createElement('div');
             participantEl.className = `absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ${participant.isConnected ? '' : 'opacity-50'}`;
-            participantEl.style.left = `calc(50% + ${x}px)`;
-            participantEl.style.top = `calc(50% + ${y}px)`;
+
+            // Position relative to the center of the container
+            participantEl.style.left = `${centerX + x}px`;
+            participantEl.style.top = `${centerY + y}px`;
             participantEl.setAttribute('data-user-id', id);
 
             // Add click event for collision animation (only for other users)
             if (id !== socket.id) {
                 participantEl.style.cursor = 'pointer';
-                participantEl.addEventListener('click', () => {
+                participantEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent event bubbling
                     if (!isAnimating) {
                         // Emit collision event to server
                         socket.emit('user-collision', {
@@ -373,9 +381,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             attackerId: socket.id,
                             targetId: id
                         });
-
                         // Start local animation immediately for better responsiveness
-                        animateCollision(socket.id, id);
+                        animateSmoothPunch(socket.id, id);
                     }
                 });
             }
@@ -385,23 +392,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 : `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-2xl text-gray-500"></i></div>`;
 
             participantEl.innerHTML = `
-                <div class="dbz-participant-card w-20 h-20 rounded-full overflow-hidden shadow-lg border-2 ${id === socket.id ? 'border-yellow-500' : 'border-gray-700'}">
-                    ${avatarContent}
-                </div>
-                <div class="text-center mt-2 text-sm font-medium">${participant.name}</div>
-                <div class="vote-indicator hidden text-center mt-1">
-                    <div class="dbz-vote-card inline-block px-3 py-1 rounded-lg font-bold">?</div>
-                </div>
-            `;
+            <div class="dbz-participant-card w-20 h-20 rounded-full overflow-hidden shadow-lg border-2 ${id === socket.id ? 'border-yellow-500' : 'border-gray-700'} pointer-events-auto">
+                ${avatarContent}
+            </div>
+            <div class="text-center mt-2 text-sm font-medium pointer-events-none">${participant.name}</div>
+            <div class="vote-indicator hidden text-center mt-1 pointer-events-none">
+                <div class="dbz-vote-card inline-block px-3 py-1 rounded-lg font-bold">?</div>
+            </div>
+        `;
 
             participantsContainer.appendChild(participantEl);
         });
     }
 
     // Enhanced function to animate collision between users (local)
-    function animateCollision(attackerId, targetId) {
+    function animateSmoothPunch(attackerId, targetId) {
         if (isAnimating) return;
-
         isAnimating = true;
 
         const attackerEl = document.querySelector(`[data-user-id="${attackerId}"]`);
@@ -412,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Get positions
+        // Get positions relative to the container
         const containerRect = participantsContainer.getBoundingClientRect();
         const attackerRect = attackerEl.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
@@ -429,71 +435,74 @@ document.addEventListener('DOMContentLoaded', () => {
         attackerEl.style.setProperty('--target-x', `${targetX - startX}px`);
         attackerEl.style.setProperty('--target-y', `${targetY - startY}px`);
 
-        // Add animation class
-        attackerEl.classList.add('animate-collision');
+        // Create motion trail effect
+        createMotionTrail(startX, startY, targetX, targetY);
 
-        // Play punch sound if enabled
+        // Add smooth animation class
+        attackerEl.classList.add('animate-smooth-punch');
+
+        // Play punch sound with slight delay for impact timing
         if (soundEnabled) {
-            const playPromise = punchSound.cloneNode(true).play();
-
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    console.warn('Error playing punch sound:', error);
-                });
-            }
+            setTimeout(() => {
+                const playPromise = punchSound.cloneNode(true).play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.warn('Error playing punch sound:', error);
+                    });
+                }
+            }, 600); // Time to reach the target (50% of 1.2s)
         }
 
-        // Create screen flash effect
+        // Create quick screen flash effect
         const screenFlash = document.createElement('div');
-        screenFlash.className = 'screen-flash';
+        screenFlash.className = 'quick-flash';
         document.body.appendChild(screenFlash);
 
         // Remove screen flash after animation
         setTimeout(() => {
             screenFlash.remove();
-        }, 200);
+        }, 400);
 
-        // Create collision effect at target position
+        // Create impact burst at target position
         setTimeout(() => {
             const effect = document.createElement('div');
-            effect.className = 'collision-effect';
-            effect.style.left = `${targetX - 40}px`;
-            effect.style.top = `${targetY - 40}px`;
+            effect.className = 'impact-burst';
+            effect.style.left = `${targetX - 50}px`;
+            effect.style.top = `${targetY - 50}px`;
             participantsContainer.appendChild(effect);
 
-            // Add shake animation to target
-            targetEl.classList.add('animate-shake');
+            // Add impact shake to target
+            targetEl.classList.add('animate-impact-shake');
 
-            // Create impact particles
+            // Create enhanced impact particles
             createImpactParticles(targetX, targetY);
 
-            // Create collision text
-            const collisionText = document.createElement('div');
-            collisionText.className = 'collision-text';
-            collisionText.textContent = 'POW!';
-            collisionText.style.left = `${targetX}px`;
-            collisionText.style.top = `${targetY - 40}px`;
-            participantsContainer.appendChild(collisionText);
+            // Create punch text
+            const punchText = document.createElement('div');
+            punchText.className = 'punch-text';
+            punchText.textContent = 'POW!';
+            punchText.style.left = `${targetX}px`;
+            punchText.style.top = `${targetY - 50}px`;
+            participantsContainer.appendChild(punchText);
 
             // Remove effect after animation completes
             setTimeout(() => {
                 effect.remove();
-                targetEl.classList.remove('animate-shake');
-                collisionText.remove();
-            }, 600);
-        }, 600); // Timing to match the collision animation (60% of 1s)
+                targetEl.classList.remove('animate-impact-shake');
+                punchText.remove();
+            }, 800);
+        }, 600); // Timing to match the collision animation (50% of 1.2s)
 
         // Remove animation class after animation completes
         setTimeout(() => {
-            attackerEl.classList.remove('animate-collision');
+            attackerEl.classList.remove('animate-smooth-punch');
             isAnimating = false;
-        }, 1000);
+        }, 1200);
     }
 
     // New function to animate collision broadcast from other users
-    function animateCollisionBroadcast(attackerId, targetId, attackerName, targetName) {
+    function animateSmoothPunchBroadcast(attackerId, targetId, attackerName, targetName) {
         if (isAnimating) return;
-
         isAnimating = true;
 
         const attackerEl = document.querySelector(`[data-user-id="${attackerId}"]`);
@@ -504,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Get positions
+        // Get positions relative to the container
         const containerRect = participantsContainer.getBoundingClientRect();
         const attackerRect = attackerEl.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
@@ -521,183 +530,189 @@ document.addEventListener('DOMContentLoaded', () => {
         attackerEl.style.setProperty('--target-x', `${targetX - startX}px`);
         attackerEl.style.setProperty('--target-y', `${targetY - startY}px`);
 
-        // Add animation class
-        attackerEl.classList.add('animate-collision');
+        // Create motion trail effect
+        createMotionTrail(startX, startY, targetX, targetY);
 
-        // Play punch sound if enabled
+        // Add smooth animation class
+        attackerEl.classList.add('animate-smooth-punch');
+
+        // Play punch sound with slight delay for impact timing
         if (soundEnabled) {
-            const playPromise = punchSound.cloneNode(true).play();
-
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    console.warn('Error playing punch sound:', error);
-                });
-            }
+            setTimeout(() => {
+                const playPromise = punchSound.cloneNode(true).play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.warn('Error playing punch sound:', error);
+                    });
+                }
+            }, 600); // Time to reach the target (50% of 1.2s)
         }
 
-        // Create screen flash effect
+        // Create quick screen flash effect
         const screenFlash = document.createElement('div');
-        screenFlash.className = 'screen-flash';
+        screenFlash.className = 'quick-flash';
         document.body.appendChild(screenFlash);
 
         // Remove screen flash after animation
         setTimeout(() => {
             screenFlash.remove();
-        }, 200);
+        }, 400);
 
         // Show collision overlay with attacker and target names
         collisionOverlay.classList.remove('hidden');
 
         // Create collision text with names
         const collisionText = document.createElement('div');
-        collisionText.className = 'collision-text';
+        collisionText.className = 'punch-text';
         collisionText.textContent = `${attackerName} hits ${targetName}!`;
         collisionText.style.left = '50%';
         collisionText.style.top = '30%';
         collisionText.style.transform = 'translateX(-50%)';
-        collisionText.style.fontSize = '1.5rem';
+        collisionText.style.fontSize = '1.8rem';
+        collisionText.style.animationDelay = '0.2s';
         collisionContainer.appendChild(collisionText);
 
-        // Create collision effect at target position
+        // Create impact burst at target position
         setTimeout(() => {
             const effect = document.createElement('div');
-            effect.className = 'collision-effect';
-            effect.style.left = `${targetX - 40}px`;
-            effect.style.top = `${targetY - 40}px`;
+            effect.className = 'impact-burst';
+            effect.style.left = `${targetX - 50}px`;
+            effect.style.top = `${targetY - 50}px`;
             participantsContainer.appendChild(effect);
 
-            // Add shake animation to target
-            targetEl.classList.add('animate-shake');
+            // Add impact shake to target
+            targetEl.classList.add('animate-impact-shake');
 
-            // Create impact particles
+            // Create enhanced impact particles
             createImpactParticles(targetX, targetY);
 
             // Create POW text
             const powText = document.createElement('div');
-            powText.className = 'collision-text';
+            powText.className = 'punch-text';
             powText.textContent = 'POW!';
             powText.style.left = `${targetX}px`;
-            powText.style.top = `${targetY - 40}px`;
+            powText.style.top = `${targetY - 50}px`;
             participantsContainer.appendChild(powText);
 
             // Remove effect after animation completes
             setTimeout(() => {
                 effect.remove();
-                targetEl.classList.remove('animate-shake');
+                targetEl.classList.remove('animate-impact-shake');
                 powText.remove();
-            }, 600);
-        }, 600); // Timing to match the collision animation (60% of 1s)
+            }, 800);
+        }, 600); // Timing to match the collision animation (50% of 1.2s)
 
         // Remove animation class and hide overlay after animation completes
         setTimeout(() => {
-            attackerEl.classList.remove('animate-collision');
+            attackerEl.classList.remove('animate-smooth-punch');
             collisionText.remove();
             collisionOverlay.classList.add('hidden');
             isAnimating = false;
-        }, 1000);
+        }, 1200);
     }
 
-    // New function to create impact particles
     function createImpactParticles(x, y) {
-        const particleCount = 12;
+        const particleCount = 15;
+
+        // Create a container for particles to ensure proper positioning
+        const particleContainer = document.createElement('div');
+        particleContainer.style.position = 'absolute';
+        particleContainer.style.left = '0';
+        particleContainer.style.top = '0';
+        particleContainer.style.width = '100%';
+        particleContainer.style.height = '100%';
+        particleContainer.style.pointerEvents = 'none';
+        particleContainer.style.zIndex = '102';
+        participantsContainer.appendChild(particleContainer);
 
         for (let i = 0; i < particleCount; i++) {
             const particle = document.createElement('div');
             particle.className = 'impact-particle';
 
-            // Random direction for each particle
-            const angle = (i / particleCount) * Math.PI * 2;
-            const distance = 50 + Math.random() * 50;
+            // Random direction for each particle with more variation
+            const angle = (i / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+            const distance = 40 + Math.random() * 80;
             const tx = Math.cos(angle) * distance;
             const ty = Math.sin(angle) * distance;
 
+            // Set CSS variables for animation
             particle.style.setProperty('--tx', `${tx}px`);
             particle.style.setProperty('--ty', `${ty}px`);
-            particle.style.left = `${x}px`;
-            particle.style.top = `${y}px`;
+
+            // Random size variation
+            const size = 4 + Math.random() * 4;
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
 
             // Random color variations
-            const colors = ['#ffffff', '#ff9500', '#ff8c00', '#ffd700'];
+            const colors = ['#ffffff', '#ffeb3b', '#ff9800', '#ff5722'];
             const randomColor = colors[Math.floor(Math.random() * colors.length)];
             particle.style.background = `radial-gradient(circle, ${randomColor} 0%, rgba(255,149,0,0.5) 100%)`;
 
-            participantsContainer.appendChild(particle);
+            // Position particle at the impact point, centered
+            particle.style.left = `${x - size / 2}px`;  // Subtract half the width to center
+            particle.style.top = `${y - size / 2}px`;   // Subtract half the height to center
+
+            // Random animation delay for more natural effect
+            particle.style.animationDelay = `${Math.random() * 0.1}s`;
+            particleContainer.appendChild(particle);
 
             // Remove particle after animation completes
             setTimeout(() => {
                 particle.remove();
-            }, 800);
+            }, 800 + Math.random() * 100);
         }
+
+        // Remove the container after all particles are gone
+        setTimeout(() => {
+            particleContainer.remove();
+        }, 1000);
     }
 
-    // New function to animate collision between users
-    function animateCollision(attackerId, targetId) {
-        if (isAnimating) return;
+    function createMotionTrail(startX, startY, targetX, targetY) {
+        const trailCount = 5;
 
-        isAnimating = true;
+        // Create a container for trail effects to ensure proper positioning
+        const trailContainer = document.createElement('div');
+        trailContainer.style.position = 'absolute';
+        trailContainer.style.left = '0';
+        trailContainer.style.top = '0';
+        trailContainer.style.width = '100%';
+        trailContainer.style.height = '100%';
+        trailContainer.style.pointerEvents = 'none';
+        trailContainer.style.zIndex = '99';
+        participantsContainer.appendChild(trailContainer);
 
-        const attackerEl = document.querySelector(`[data-user-id="${attackerId}"]`);
-        const targetEl = document.querySelector(`[data-user-id="${targetId}"]`);
+        for (let i = 0; i < trailCount; i++) {
+            const trail = document.createElement('div');
+            trail.className = 'motion-trail';
 
-        if (!attackerEl || !targetEl) {
-            isAnimating = false;
-            return;
-        }
+            // Calculate position along the path
+            const progress = (i + 1) / (trailCount + 1);
+            const x = startX + (targetX - startX) * progress;
+            const y = startY + (targetY - startY) * progress;
 
-        // Get positions
-        const containerRect = participantsContainer.getBoundingClientRect();
-        const attackerRect = attackerEl.getBoundingClientRect();
-        const targetRect = targetEl.getBoundingClientRect();
+            // Set CSS variables for animation
+            trail.style.setProperty('--tx', `${targetX - startX}px`);
+            trail.style.setProperty('--ty', `${targetY - startY}px`);
 
-        // Calculate positions relative to container
-        const startX = attackerRect.left - containerRect.left + attackerRect.width / 2;
-        const startY = attackerRect.top - containerRect.top + attackerRect.height / 2;
-        const targetX = targetRect.left - containerRect.left + targetRect.width / 2;
-        const targetY = targetRect.top - containerRect.top + targetRect.height / 2;
+            // Position trail at the calculated point, centered
+            trail.style.left = `${x - 40}px`;  // Subtract half the width (80px) to center
+            trail.style.top = `${y - 40}px`;   // Subtract half the height (80px) to center
 
-        // Set CSS variables for animation
-        attackerEl.style.setProperty('--start-x', '0px');
-        attackerEl.style.setProperty('--start-y', '0px');
-        attackerEl.style.setProperty('--target-x', `${targetX - startX}px`);
-        attackerEl.style.setProperty('--target-y', `${targetY - startY}px`);
+            trail.style.animationDelay = `${i * 0.08}s`;
+            trailContainer.appendChild(trail);
 
-        // Add animation class
-        attackerEl.classList.add('animate-collision');
-
-        // Play punch sound if enabled
-        if (soundEnabled) {
-            const playPromise = punchSound.cloneNode(true).play();
-
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    console.warn('Error playing punch sound:', error);
-                });
-            }
-        }
-
-        // Create collision effect at target position
-        setTimeout(() => {
-            const effect = document.createElement('div');
-            effect.className = 'collision-effect';
-            effect.style.left = `${targetX - 30}px`;
-            effect.style.top = `${targetY - 30}px`;
-            participantsContainer.appendChild(effect);
-
-            // Add shake animation to target
-            targetEl.classList.add('animate-shake');
-
-            // Remove effect after animation completes
+            // Remove trail after animation completes
             setTimeout(() => {
-                effect.remove();
-                targetEl.classList.remove('animate-shake');
-            }, 500);
-        }, 560); // Timing to match the collision animation (70% of 0.8s)
+                trail.remove();
+            }, 500 + i * 80);
+        }
 
-        // Remove animation class after animation completes
+        // Remove the container after all trails are gone
         setTimeout(() => {
-            attackerEl.classList.remove('animate-collision');
-            isAnimating = false;
-        }, 800);
+            trailContainer.remove();
+        }, 900);
     }
 
     // Load voting cards
