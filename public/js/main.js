@@ -76,6 +76,19 @@ document.addEventListener('DOMContentLoaded', () => {
         creditCard.classList.remove('visible');
     });
 
+    // Reset button
+    resetBtn.addEventListener('click', () => {
+        console.log('Reset button clicked, emitting reset-votes event');
+
+        // Add visual feedback
+        resetBtn.classList.add('animate-pulse');
+        setTimeout(() => {
+            resetBtn.classList.remove('animate-pulse');
+        }, 1000);
+
+        socket.emit('reset-votes', sessionId);
+    });
+
     // Handle heart button click
     if (heartButton) {
         heartButton.addEventListener('click', function () {
@@ -312,6 +325,35 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Add this to your setupSocketListeners function
+        socket.on('all-votes-in', () => {
+            voteStatus.textContent = 'All votes in! Revealing results...';
+        });
+
+        socket.on('vote-updated', (data) => {
+            const { userId, vote } = data;
+
+            // Only show the vote if it's the current user's vote
+            if (userId === socket.id) {
+                const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
+                if (participantEl) {
+                    const voteIndicator = participantEl.querySelector('.vote-indicator');
+                    if (voteIndicator) {
+                        voteIndicator.classList.remove('hidden');
+                        voteIndicator.querySelector('.dbz-vote-card').textContent = vote;
+                    }
+                }
+
+                // Update card selection visual for the current user
+                document.querySelectorAll('.dbz-card-btn').forEach(card => {
+                    card.classList.remove('ring-2', 'ring-yellow-400');
+                    if (card.textContent === vote) {
+                        card.classList.add('ring-2', 'ring-yellow-400');
+                    }
+                });
+            }
+        });
+
         socket.on('vote-count-updated', (data) => {
             const { current, total } = data;
             voteCounter.textContent = `${current}/${total} votes`;
@@ -324,15 +366,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('voting-complete', (data) => {
             const { votes, results } = data;
+
             // Update vote counter to show the correct total
             const totalVotes = Object.keys(votes).length;
             const totalConnected = Object.values(participants).filter(p => p.isConnected).length;
             voteCounter.textContent = `${totalVotes}/${totalConnected} votes`;
+
+            // Show results (which will reveal all votes)
             showResults(votes, results);
+
+            // Disable all cards to prevent further voting
+            document.querySelectorAll('.dbz-card-btn').forEach(card => {
+                card.disabled = true;
+                card.classList.add('opacity-50', 'cursor-not-allowed');
+            });
+        });
+
+        socket.on('voting-closed', () => {
+            // Show a notification that voting is closed
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-yellow-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            notification.textContent = 'Voting is closed! Please wait for the next round.';
+            document.body.appendChild(notification);
+
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
         });
 
         socket.on('votes-reset', () => {
+            console.log('Received votes-reset event from server');
             resetVoting();
+
+            // Show a notification that voting has been reset
+            showNotification('Voting has been reset! You can now vote again.', 'success');
         });
 
         socket.on('deck-changed', (data) => {
@@ -386,50 +454,61 @@ document.addEventListener('DOMContentLoaded', () => {
         const centerX = containerRect.width / 2;
         const centerY = containerRect.height / 2;
 
-        // Dynamic radius based on number of participants and screen size
-        let radius = 180; // Default radius for 1-2 participants
-        if (totalParticipants >= 3 && totalParticipants <= 5) {
-            radius = 220; // Medium radius for 3-5 participants
-        } else if (totalParticipants >= 6 && totalParticipants <= 8) {
-            radius = 260; // Larger radius for 6-8 participants
-        } else if (totalParticipants > 8) {
-            radius = 300; // Largest radius for 9+ participants
+        // Oval dimensions (semi-major and semi-minor axes)
+        const radiusX = 220; // Horizontal radius (wider)
+        const radiusY = 140; // Vertical radius (shorter)
+
+        // Adjust oval dimensions based on number of participants
+        let adjustedRadiusX = radiusX;
+        let adjustedRadiusY = radiusY;
+
+        if (totalParticipants >= 8) {
+            adjustedRadiusX = radiusX + 20;
+            adjustedRadiusY = radiusY + 15;
+        } else if (totalParticipants >= 6) {
+            adjustedRadiusX = radiusX + 10;
+            adjustedRadiusY = radiusY + 8;
         }
 
         // Adjust radius based on screen size
         if (window.innerWidth < 640) { // Mobile
-            radius *= 0.7; // Reduce radius for mobile
+            adjustedRadiusX *= 0.6;
+            adjustedRadiusY *= 0.6;
         } else if (window.innerWidth < 1024) { // Tablet
-            radius *= 0.85; // Reduce radius for tablet
+            adjustedRadiusX *= 0.8;
+            adjustedRadiusY *= 0.8;
         }
 
+        // Position participants in an oval
         participantIds.forEach((id, index) => {
             const participant = participants[id];
-            const angle = (index / totalParticipants) * 2 * Math.PI;
-            const x = Math.cos(angle) * radius;
-            const y = Math.sin(angle) * radius;
+
+            // Calculate angle for even distribution
+            const angle = (index / totalParticipants) * 2 * Math.PI - Math.PI / 2; // Start from top
+
+            // Calculate position on oval
+            const x = centerX + Math.cos(angle) * adjustedRadiusX;
+            const y = centerY + Math.sin(angle) * adjustedRadiusY;
 
             const participantEl = document.createElement('div');
             participantEl.className = `absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ${participant.isConnected ? '' : 'opacity-50'}`;
 
-            // Position relative to the center of the container
-            participantEl.style.left = `${centerX + x}px`;
-            participantEl.style.top = `${centerY + y}px`;
+            // Position the participant
+            participantEl.style.left = `${x}px`;
+            participantEl.style.top = `${y}px`;
             participantEl.setAttribute('data-user-id', id);
 
             // Add click event for collision animation (only for other users)
             if (id !== socket.id) {
                 participantEl.style.cursor = 'pointer';
                 participantEl.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent event bubbling
+                    e.stopPropagation();
                     if (!isAnimating) {
-                        // Emit collision event to server
                         socket.emit('user-collision', {
                             sessionId,
                             attackerId: socket.id,
                             targetId: id
                         });
-                        // Start local animation immediately for better responsiveness
                         animateSmoothPunch(socket.id, id);
                     }
                 });
@@ -437,20 +516,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const avatarContent = participant.avatar
                 ? `<img src="${participant.avatar}" alt="${participant.name}" class="w-full h-full object-cover">`
-                : `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-2xl text-gray-500"></i></div>`;
+                : `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-xl text-gray-500"></i></div>`;
 
             participantEl.innerHTML = `
-                <div class="dbz-participant-card w-20 h-20 rounded-full overflow-hidden shadow-lg border-2 ${id === socket.id ? 'border-yellow-500' : 'border-gray-700'} pointer-events-auto">
-                    ${avatarContent}
-                </div>
-                <div class="text-center mt-2 text-sm font-medium participant-name pointer-events-none">${participant.name}</div>
-                <div class="vote-indicator hidden text-center mt-1 pointer-events-none">
-                    <div class="dbz-vote-card inline-block px-3 py-1 rounded-lg font-bold">?</div>
-                </div>
-            `;
+            <div class="dbz-participant-card w-16 h-16 rounded-full overflow-hidden shadow-lg border-2 ${id === socket.id ? 'border-yellow-500' : 'border-gray-700'} pointer-events-auto">
+                ${avatarContent}
+            </div>
+            <div class="text-center mt-1 text-xs font-medium participant-name pointer-events-none">${participant.name}</div>
+            <div class="vote-indicator hidden text-center mt-1 pointer-events-none">
+                <div class="dbz-vote-card inline-block px-2 py-1 rounded-lg font-bold">?</div>
+            </div>
+        `;
 
             participantsContainer.appendChild(participantEl);
         });
+
+        // Add a subtle animation to the table when users join/leave
+        const table = document.querySelector('.dbz-table');
+        if (table) {
+            table.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                table.style.transform = 'scale(1)';
+            }, 300);
+        }
     }
 
     // Enhanced function to animate collision between users (local)
@@ -879,16 +967,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Add a window resize handler to update the layout when the screen size changes
+    // Update the existing window resize handler
     window.addEventListener('resize', () => {
-        // Re-render participants to adjust their positions
-        if (Object.keys(participants).length > 0) {
-            renderParticipants();
-        }
-
-        // Re-load cards to adjust their sizes
-        if (currentCards.length > 0) {
-            loadCards(currentCards);
-        }
+        // Debounce the resize event
+        clearTimeout(window.resizeTimer);
+        window.resizeTimer = setTimeout(() => {
+            // Re-render participants to adjust their positions
+            if (Object.keys(participants).length > 0) {
+                renderParticipants();
+            }
+            // Re-load cards to adjust their sizes
+            if (currentCards.length > 0) {
+                loadCards(currentCards);
+            }
+        }, 250);
     });
 
     window.addEventListener('beforeunload', () => {
@@ -902,25 +994,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (heartbeatInterval) clearInterval(heartbeatInterval);
     });
 
-    // Submit vote
+    // Submit vote (or change vote)
     function submitVote(value) {
-        if (hasVoted) return;
+        // Don't allow vote changes if voting is complete
+        if (hasVoted && cardsContainer.classList.contains('hidden')) {
+            return;
+        }
 
-        hasVoted = true;
         socket.emit('submit-vote', { sessionId, vote: value });
 
-        // Disable all cards
-        document.querySelectorAll('.dbz-card-btn').forEach(card => {
-            card.disabled = true;
-            card.classList.add('opacity-50', 'cursor-not-allowed');
-        });
-
-        // Show user's vote on their avatar
+        // Only show the current user's vote, not others
         const userVoteIndicator = document.querySelector(`[data-user-id="${socket.id}"] .vote-indicator`);
         if (userVoteIndicator) {
             userVoteIndicator.classList.remove('hidden');
             userVoteIndicator.querySelector('.dbz-vote-card').textContent = value;
         }
+
+        // Add visual feedback for the selected card
+        document.querySelectorAll('.dbz-card-btn').forEach(card => {
+            card.classList.remove('ring-2', 'ring-yellow-400');
+            if (card.textContent === value) {
+                card.classList.add('ring-2', 'ring-yellow-400');
+            }
+        });
+
+        // Set flag that user has voted
+        hasVoted = true;
     }
 
     // Show voting results
@@ -936,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'text-2xl font-bold text-green-500' :
             'text-2xl font-bold text-red-500';
 
-        // Show all votes
+        // Show all votes with participant names
         Object.keys(votes).forEach(userId => {
             const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
             if (participantEl) {
@@ -951,6 +1050,138 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create and display the bar chart
         createVoteChart(votes);
         voteStatus.textContent = 'Voting complete!';
+
+        // Create detailed vote breakdown
+        createVoteBreakdown(votes);
+
+        // Set flag that voting is complete
+        hasVoted = true;
+    }
+
+    function createVoteBreakdown(votes) {
+        // Check if breakdown container already exists
+        let breakdownContainer = document.getElementById('vote-breakdown');
+
+        // If it doesn't exist, create it
+        if (!breakdownContainer) {
+            breakdownContainer = document.createElement('div');
+            breakdownContainer.id = 'vote-breakdown';
+            breakdownContainer.className = 'mt-4 w-full';
+
+            // Insert it after the vote chart
+            const voteChart = document.getElementById('vote-chart');
+            if (voteChart && voteChart.parentNode) {
+                voteChart.parentNode.insertBefore(breakdownContainer, voteChart.nextSibling);
+            } else {
+                resultsArea.appendChild(breakdownContainer);
+            }
+        } else {
+            breakdownContainer.innerHTML = '';
+        }
+
+        // Create title
+        const title = document.createElement('h3');
+        title.className = 'text-lg font-semibold mb-3 text-center';
+        title.textContent = 'Individual Votes';
+        breakdownContainer.appendChild(title);
+
+        // Create single-row container for votes
+        const votesRow = document.createElement('div');
+        votesRow.className = 'flex flex-row overflow-x-auto pb-2 space-x-2 md:space-x-3 lg:space-x-4 scrollbar-hide';
+
+        // Sort participants by name for consistent display
+        const sortedVotes = Object.entries(votes).sort((a, b) => {
+            const nameA = participants[a[0]]?.name || 'Unknown';
+            const nameB = participants[b[0]]?.name || 'Unknown';
+            return nameA.localeCompare(nameB);
+        });
+
+        // Create static vote cards in single row
+        sortedVotes.forEach(([userId, vote]) => {
+            const participant = participants[userId];
+            const voteCard = document.createElement('div');
+            voteCard.className = 'flex-shrink-0 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700 p-2';
+
+            // Create a compact vertical layout for each vote
+            const cardContent = document.createElement('div');
+            cardContent.className = 'flex flex-col items-center space-y-1';
+
+            // Avatar section
+            const avatarContainer = document.createElement('div');
+            avatarContainer.className = 'w-10 h-10 rounded-full overflow-hidden bg-gray-700 border border-gray-600 flex-shrink-0';
+
+            if (participant?.avatar) {
+                avatarContainer.innerHTML = `<img src="${participant.avatar}" alt="${participant.name}" class="w-full h-full object-cover">`;
+            } else {
+                avatarContainer.innerHTML = '<i class="fas fa-user text-gray-500 w-full h-full flex items-center justify-center"></i>';
+            }
+
+            // Name section (compact)
+            const nameText = document.createElement('div');
+            nameText.className = 'text-xs font-medium text-gray-300 text-center truncate max-w-[4rem]';
+            nameText.textContent = participant?.name || 'Unknown';
+            nameText.title = participant?.name || 'Unknown';
+
+            // Vote value section
+            const voteValue = document.createElement('div');
+            voteValue.className = `flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${vote === '?'
+                    ? 'bg-gray-700 text-gray-300'
+                    : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-gray-900'
+                }`;
+            voteValue.textContent = vote;
+
+            // Assemble the card content
+            cardContent.appendChild(avatarContainer);
+            cardContent.appendChild(nameText);
+            cardContent.appendChild(voteValue);
+
+            voteCard.appendChild(cardContent);
+            votesRow.appendChild(voteCard);
+        });
+
+        breakdownContainer.appendChild(votesRow);
+
+        // Add compact summary statistics
+        const summaryStats = document.createElement('div');
+        summaryStats.className = 'mt-4 p-3 bg-gray-800 bg-opacity-30 rounded-lg border border-gray-700';
+
+        const totalVotes = Object.keys(votes).length;
+        const connectedUsers = Object.values(participants).filter(p => p.isConnected).length;
+        const questionMarks = Object.values(votes).filter(vote => vote === '?').length;
+
+        summaryStats.innerHTML = `
+        <div class="flex justify-around items-center">
+            <div class="text-center">
+                <div class="text-lg font-bold text-yellow-400">${totalVotes}</div>
+                <div class="text-xs text-gray-300">Votes</div>
+            </div>
+            <div class="text-center">
+                <div class="text-lg font-bold text-green-400">${connectedUsers}</div>
+                <div class="text-xs text-gray-300">Players</div>
+            </div>
+            <div class="text-center">
+                <div class="text-lg font-bold text-blue-400">${questionMarks}</div>
+                <div class="text-xs text-gray-300">Uncertain</div>
+            </div>
+        </div>
+    `;
+
+        breakdownContainer.appendChild(summaryStats);
+    }
+
+    // Helper function to show notifications
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500' :
+            type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+            } text-white`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
     }
 
     // New function to create the vote chart
@@ -1043,6 +1274,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Reset voting
     function resetVoting() {
+        console.log('Resetting voting UI');
+
         hasVoted = false;
         cardsContainer.classList.remove('hidden');
         resultsArea.classList.add('hidden');
@@ -1050,10 +1283,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear the chart
         voteChart.innerHTML = '';
 
-        // Re-enable all cards
+        // Reset visual indicators on cards
         document.querySelectorAll('.dbz-card-btn').forEach(card => {
             card.disabled = false;
-            card.classList.remove('opacity-50', 'cursor-not-allowed');
+            card.classList.remove('opacity-50', 'cursor-not-allowed', 'ring-2', 'ring-yellow-400');
         });
 
         // Hide all vote indicators
@@ -1063,25 +1296,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         voteStatus.textContent = 'Waiting for votes...';
         voteCounter.textContent = '0/0 votes';
+
+        console.log('Voting UI reset complete');
     }
-
-    // Reset button
-    resetBtn.addEventListener('click', () => {
-        socket.emit('reset-votes', sessionId);
-    });
-
-    // Settings modal
-    settingsBtn.addEventListener('click', () => {
-        settingsModal.classList.remove('hidden');
-        soundToggle.checked = soundEnabled;
-        themeSelector.value = currentTheme;
-        deckSelector.value = currentDeckType;
-
-        // Update avatar preview
-        if (user.avatar) {
-            settingsAvatarPreview.innerHTML = `<img src="${user.avatar}" alt="Avatar" class="w-full h-full object-cover">`;
-        }
-    });
 
     closeSettings.addEventListener('click', () => {
         settingsModal.classList.add('hidden');

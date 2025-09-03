@@ -111,6 +111,41 @@ function checkConsensus(votes) {
     return validVotes.every(vote => vote === firstVote);
 }
 
+function calculateResults(votes) {
+    if (votes.length === 0) {
+        return {
+            mode: '-',
+            average: '-',
+            consensus: false
+        };
+    }
+
+    // Calculate mode (most frequent value)
+    const frequency = {};
+    votes.forEach(vote => {
+        frequency[vote] = (frequency[vote] || 0) + 1;
+    });
+
+    const mode = Object.keys(frequency).reduce((a, b) =>
+        frequency[a] > frequency[b] ? a : b
+    );
+
+    // Calculate average (for numeric votes)
+    const numericVotes = votes.filter(vote => !isNaN(vote)).map(Number);
+    const average = numericVotes.length > 0
+        ? (numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length).toFixed(1)
+        : '-';
+
+    // Check for consensus (70% agreement)
+    const consensus = frequency[mode] / votes.length >= 0.7;
+
+    return {
+        mode,
+        average,
+        consensus
+    };
+}
+
 // Heartbeat mechanism to detect disconnected users
 setInterval(() => {
     Object.keys(sessions).forEach(sessionId => {
@@ -154,6 +189,7 @@ io.on('connection', (socket) => {
                 showVotes: false,
                 gameActive: false
             };
+            console.log('Created new session:', sessionId);
         }
 
         // Add user to session (avatar is now just a path, not base64 data)
@@ -217,53 +253,80 @@ io.on('connection', (socket) => {
     // Handle vote submission
     socket.on('submit-vote', (data) => {
         const { sessionId, vote } = data;
+        const session = sessions[sessionId];
 
-        if (sessions[sessionId]) {
-            console.log(`Vote received from ${socket.id}: ${vote}`);
-            sessions[sessionId].votes[socket.id] = vote;
+        // Don't allow vote changes if voting is complete
+        if (session.showVotes) {
+            // Optionally notify the user that voting is closed
+            socket.emit('voting-closed');
+            return;
+        }
 
-            // Check if all users have voted
-            const connectedUsers = Object.values(sessions[sessionId].users).filter(user => user.isConnected);
-            const votesCount = Object.keys(sessions[sessionId].votes).length;
+        // Update or create the vote for this user
+        session.votes[socket.id] = vote;
 
-            if (votesCount === connectedUsers.length) {
-                // Calculate results
-                const votes = Object.values(sessions[sessionId].votes);
-                const mode = calculateMode(votes);
-                const average = calculateAverage(votes);
-                const consensus = checkConsensus(votes);
+        // Emit the updated vote to all clients
+        io.to(sessionId).emit('vote-updated', {
+            userId: socket.id,
+            vote: vote
+        });
 
-                sessions[sessionId].showVotes = true;
-                sessions[sessionId].results = { mode, average, consensus };
+        // Update vote count
+        const connectedUsers = Object.values(session.users).filter(user => user.isConnected);
+        const votesCount = Object.keys(session.votes).length;
 
-                // Notify all users
-                io.to(sessionId).emit('voting-complete', {
-                    votes: sessions[sessionId].votes,
-                    results: sessions[sessionId].results
-                });
+        io.to(sessionId).emit('vote-count-updated', {
+            current: votesCount,
+            total: connectedUsers.length
+        });
 
-                // Trigger celebration if consensus
-                if (consensus) {
-                    io.to(sessionId).emit('celebrate-consensus');
-                }
-            } else {
-                // Notify about vote count
-                io.to(sessionId).emit('vote-count-updated', {
-                    current: votesCount,
-                    total: connectedUsers.length
-                });
+        // Check if all connected users have voted
+        if (votesCount === connectedUsers.length) {
+            // Calculate results
+            const voteValues = Object.values(session.votes).filter(vote => vote !== '?');
+            const results = calculateResults(voteValues);
+
+            // Mark session as showing votes
+            session.showVotes = true;
+            session.results = results;
+
+            // Emit voting complete event
+            io.to(sessionId).emit('voting-complete', {
+                votes: session.votes,
+                results: results
+            });
+
+            // Check for consensus and trigger celebration
+            if (results.consensus) {
+                io.to(sessionId).emit('celebrate-consensus');
             }
         }
     });
 
     // Handle reset votes
     socket.on('reset-votes', (sessionId) => {
-        if (sessions[sessionId]) {
-            sessions[sessionId].votes = {};
-            sessions[sessionId].showVotes = false;
-            sessions[sessionId].results = null;
+        console.log('Reset votes requested for session:', sessionId);
 
+        const session = sessions[sessionId];
+        if (session) {
+            // Reset session data
+            session.votes = {};
+            session.showVotes = false;
+            session.results = {};
+
+            console.log('Session data reset, notifying clients');
+
+            // Notify all clients
             io.to(sessionId).emit('votes-reset');
+
+            // Also update vote count
+            const connectedUsers = Object.values(session.users).filter(user => user.isConnected);
+            io.to(sessionId).emit('vote-count-updated', {
+                current: 0,
+                total: connectedUsers.length
+            });
+        } else {
+            console.error('Session not found for reset:', sessionId);
         }
     });
 

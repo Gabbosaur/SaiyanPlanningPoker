@@ -57,6 +57,41 @@
     overflow: hidden;
 }
 
+/* Added for re-choosing card */
+.dbz-card-btn {
+    transition: all 0.2s ease;
+}
+
+.dbz-card-btn.ring-2 {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(249, 215, 28, 0.5);
+}
+
+.vote-indicator .dbz-vote-card {
+    transition: all 0.3s ease;
+}
+
+/* Add a subtle animation when vote changes */
+@keyframes vote-change {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.vote-indicator .dbz-vote-card.updated {
+    animation: vote-change 0.3s ease;
+}
+
+/* End of re-choosing card*/
+
 .dbz-card-btn:hover {
     background: linear-gradient(135deg, #3a4f6f 0%, #2a3a5a 100%);
     border-color: rgba(249, 215, 28, 0.8);
@@ -89,26 +124,32 @@
 }
 
 .dbz-table {
-    background: radial-gradient(circle, #2a3f5f 0%, #1a2a4a 100%);
+    background: radial-gradient(ellipse at center, #2a3f5f 0%, #1a2a4a 100%);
     border: 3px solid rgba(249, 215, 28, 0.5);
     box-shadow: 0 0 30px rgba(249, 215, 28, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.5);
     position: relative;
-    width: 24rem;
-    height: 24rem;
+    width: 32rem;
+    height: 20rem;
+    border-radius: 50%;
     transition: all 0.3s ease;
+    max-width: 90vw;
+    max-height: 60vh;
 }
 
 .dbz-participant-card {
     background: linear-gradient(135deg, #2a3f5f 0%, #1a2a4a 100%);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
     transition: transform 0.3s;
-    width: 5rem;
-    height: 5rem;
+    width: 4rem;
+    height: 4rem;
     pointer-events: auto;
+    border-radius: 50%;
+    border: 2px solid rgba(249, 215, 28, 0.3);
 }
 
 .dbz-participant-card:hover {
     transform: scale(1.1);
+    border-color: rgba(249, 215, 28, 0.8);
 }
 
 .dbz-card-btn {
@@ -192,15 +233,38 @@
     height: 100%;
 }
 
-#table-container>.relative {
-    width: 100%;
-    max-width: 24rem;
-    height: 24rem;
+/* Ensure the table is properly centered */
+#table-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
 }
 
-.participant-name,
-.vote-indicator {
-    pointer-events: none;
+#table-container>.relative {
+    width: 100%;
+    max-width: 36rem;
+    height: 24rem;
+    position: relative;
+    margin: 0 auto;
+}
+
+/* Update participant name styling */
+.participant-name {
+    font-size: 0.75rem;
+    /* Smaller font size */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 5rem;
+}
+
+/* Update vote indicator styling */
+.vote-indicator .dbz-vote-card {
+    padding: 1px 4px;
+    font-size: 0.7rem;
+    min-width: 1.5rem;
+    text-align: center;
 }
 
 /* Bar Chart Styles */
@@ -208,6 +272,190 @@
 #vote-chart {
     max-width: 2xl;
     margin: 0 auto;
+}
+
+/* Vote Breakdown Styles */
+#vote-breakdown {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Horizontal scrollable container */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari and Opera */
+}
+
+#vote-breakdown .vote-item {
+    transition: all 0.3s ease;
+    min-height: auto;
+}
+
+#vote-breakdown .avatar-container {
+    transition: transform 0.3s ease;
+}
+
+#vote-breakdown .vote-value {
+    transition: all 0.3s ease;
+}
+
+/* Summary stats animation */
+#vote-breakdown .summary-stats {
+    position: relative;
+    overflow: hidden;
+}
+
+#vote-breakdown .summary-stats::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(249, 215, 28, 0.1), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+
+    100% {
+        left: 100%;
+    }
+}
+
+/* Compact Results Grid */
+#compact-results {
+    animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Ensure elements are properly hidden */
+.hidden {
+    display: none !important;
+}
+
+/* Results area should take full height when active */
+#results-area {
+    min-height: 100vh;
+    width: 100%;
+    padding: 2rem;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Vote card highlighting */
+.vote-card-highlighted {
+    transform: scale(1.05) !important;
+    z-index: 10;
+    box-shadow: 0 0 20px rgba(249, 215, 28, 0.6);
+}
+
+
+@media (min-width: 1025px) and (max-width: 1280px) {
+    #compact-results .grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (min-width: 1281px) {
+    #compact-results .grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+/* Chart Enhancements */
+.chart-bar {
+    transition: all 0.3s ease;
+}
+
+.chart-bar:hover {
+    filter: brightness(1.2);
+    transform: scaleY(1.05);
+}
+
+/* Vote Card Enhancements */
+.vote-card-highlighted {
+    transform: scale(1.05) !important;
+    z-index: 10;
+}
+
+/* Mini Chart Enhancements */
+.mini-chart-bar {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: visible;
+}
+
+.mini-chart-bar:hover {
+    filter: brightness(1.2);
+    transform: scaleY(1.05);
+}
+
+/* Summary Header Gradient */
+.summary-gradient {
+    background: linear-gradient(135deg, rgba(249, 215, 28, 0.1) 0%, rgba(255, 149, 0, 0.05) 100%);
+    backdrop-filter: blur(10px);
+}
+
+/* Pulse Animation for Consensus Votes */
+@keyframes consensus-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(249, 215, 28, 0.7);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(249, 215, 28, 0);
+    }
+}
+
+.animate-pulse.consensus {
+    animation: consensus-pulse 2s infinite;
 }
 
 .vote-bar-container {
@@ -281,10 +529,12 @@
     0%,
     100% {
         opacity: 0.5;
+        transform: scale(1);
     }
 
     50% {
         opacity: 0.8;
+        transform: scale(1.01);
     }
 }
 
@@ -839,6 +1089,19 @@
     animation: border-pulse 3s infinite;
 }
 
+/* Optional: Add a subtle glow effect */
+.dbz-table::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    box-shadow: inset 0 0 20px rgba(249, 215, 28, 0.1);
+    pointer-events: none;
+}
+
 #celebration-text {
     animation: pulse-glow 1.5s infinite;
 }
@@ -1349,8 +1612,13 @@ audio {
 /* Responsive Styles */
 @media (max-width: 640px) {
     .dbz-table {
-        width: 280px !important;
-        height: 280px !important;
+        width: 24rem !important;
+        height: 16rem !important;
+    }
+
+    #table-container>.relative {
+        max-width: 28rem;
+        height: 20rem;
     }
 
     .dbz-participant-card {
@@ -1374,13 +1642,46 @@ audio {
         gap: 0.5rem;
     }
 
-    #table-container>.relative {
-        max-width: 16rem;
-        height: 16rem;
-    }
-
     .participant-name {
         font-size: 0.7rem;
+    }
+
+    .participant-card-wrapper {
+        position: relative;
+    }
+
+    .participant-card-wrapper::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #10b981;
+        /* Green for connected */
+        border: 1px solid #fff;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .participant-card-wrapper.connected::after {
+        opacity: 1;
+    }
+
+    .participant-card-wrapper.disconnected::after {
+        background-color: #ef4444;
+        /* Red for disconnected */
+        opacity: 1;
+    }
+
+    #compact-results .grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 3;
+    }
+
+    #results-area {
+        padding: 1rem;
     }
 
     .vote-indicator .dbz-vote-card {
@@ -1468,12 +1769,96 @@ audio {
         height: 20px;
         width: 20px;
     }
+
+    #compact-results .grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2px;
+    }
+
+    #compact-results .vote-card {
+        padding: 2px;
+    }
+
+    #compact-results .avatar-container {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    #compact-results .vote-value {
+        width: 1.5rem;
+        height: 1.5rem;
+        font-size: 0.75rem;
+    }
+
+    #vote-breakdown {
+        margin-top: 1rem;
+    }
+
+    #vote-breakdown .votes-grid {
+        gap: 1rem;
+    }
+
+    #vote-breakdown .vote-card {
+        padding: 0.5rem;
+        transition: all 0.3s ease;
+        min-width: auto;
+    }
+
+    #vote-breakdown .avatar-container {
+        width: 2rem;
+        height: 2rem;
+        transition: transform 0.3s ease;
+    }
+
+    #vote-breakdown .vote-value {
+        width: 2rem;
+        height: 2rem;
+        font-size: 0.75rem;
+        transition: all 0.3s ease;
+    }
+
+    /* Ensure text truncation works properly */
+    #vote-breakdown .name-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+
+    #vote-breakdown .summary-stats {
+        padding: 0.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    #vote-breakdown .summary-stats::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(249, 215, 28, 0.1), transparent);
+        animation: shimmer 2s infinite;
+    }
+
+    #vote-breakdown .summary-stats .grid {
+        gap: 0.5rem;
+    }
+
+    #vote-breakdown .summary-stats .text-lg {
+        font-size: 1rem;
+    }
+
+    #vote-breakdown .summary-stats .text-xs {
+        font-size: 0.65rem;
+    }
 }
 
 @media (min-width: 641px) and (max-width: 1024px) {
     .dbz-table {
-        width: 320px !important;
-        height: 320px !important;
+        width: 28rem !important;
+        height: 18rem !important;
     }
 
     .dbz-participant-card {
@@ -1495,8 +1880,8 @@ audio {
     }
 
     #table-container>.relative {
-        max-width: 20rem;
-        height: 20rem;
+        max-width: 32rem;
+        height: 22rem;
     }
 
     .participant-name {
@@ -1517,8 +1902,60 @@ audio {
         right: auto;
         left: 0;
     }
+
+    #compact-results .grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    #vote-breakdown .votes-grid {
+        gap: 1.5rem;
+    }
+
+    #vote-breakdown .vote-card {
+        padding: 0.5rem;
+    }
+
+    #vote-breakdown .avatar-container {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+
+    #vote-breakdown .vote-value {
+        width: 2rem;
+        height: 2rem;
+        font-size: 0.875rem;
+    }
+
+    #vote-breakdown .name-text {
+        font-size: 0.625rem;
+        max-width: 3.5rem;
+    }
 }
 
 @media (min-width: 1025px) {
-    /* Keep desktop styles as they are */
+
+    #vote-breakdown .votes-row {
+        justify-content: center;
+        flex-wrap: nowrap;
+    }
+
+    #vote-breakdown .vote-card {
+        padding: 0.5rem;
+    }
+
+    #vote-breakdown .avatar-container {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    #vote-breakdown .vote-value {
+        width: 2rem;
+        height: 2rem;
+        font-size: 0.875rem;
+    }
+
+    #vote-breakdown .name-text {
+        font-size: 0.625rem;
+        max-width: 4rem;
+    }
 }
