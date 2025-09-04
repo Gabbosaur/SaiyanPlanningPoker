@@ -76,6 +76,13 @@ document.addEventListener('DOMContentLoaded', () => {
         creditCard.classList.remove('visible');
     });
 
+    // Client-side heartbeat to keep connection alive
+    setInterval(() => {
+        if (socket && socket.connected) {
+            socket.emit('heartbeat');
+        }
+    }, 30000); // Send heartbeat every 30 seconds
+
     // Reset button
     resetBtn.addEventListener('click', () => {
         console.log('Reset button clicked, emitting reset-votes event');
@@ -439,7 +446,47 @@ document.addEventListener('DOMContentLoaded', () => {
             // Only show reconnection notification for unexpected disconnections
             if (reason !== 'io client disconnect') {
                 showReconnectNotification();
+
+                // Attempt to reconnect automatically after 5 seconds
+                setTimeout(() => {
+                    if (!socket.connected) {
+                        console.log('Attempting to reconnect...');
+                        socket.connect();
+                    }
+                }, 5000);
             }
+        });
+
+        // Handle reconnection success
+        socket.on('connect', () => {
+            console.log('Reconnected to server');
+
+            // Hide any reconnection notification
+            const notification = document.querySelector('.reconnect-notification');
+            if (notification) {
+                notification.remove();
+            }
+
+            // Rejoin the session if we have one
+            if (sessionId && user.name) {
+                console.log('Rejoining session:', sessionId);
+                socket.emit('join-session', {
+                    sessionId,
+                    user
+                });
+            }
+        });
+
+        socket.on('reconnect', () => {
+            updateConnectionStatus('connected');
+        });
+
+        socket.on('reconnect_attempt', () => {
+            updateConnectionStatus('connecting');
+        });
+
+        socket.on('reconnect_failed', () => {
+            updateConnectionStatus('disconnected');
         });
     }
 
@@ -860,24 +907,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Create a notification element
         const notification = document.createElement('div');
-        notification.className = 'reconnect-notification fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center space-x-3';
+        notification.className = 'reconnect-notification fixed top-4 right-4 bg-orange-600 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex flex-col space-y-2';
         notification.innerHTML = `
         <div class="flex items-center">
             <i class="fas fa-exclamation-triangle mr-2"></i>
-            <span>Connection lost. Please reconnect.</span>
+            <span>Connection lost. Attempting to reconnect...</span>
         </div>
-        <button id="reconnect-btn" class="bg-white text-red-600 px-3 py-1 rounded text-sm font-medium hover:bg-gray-100 transition">
-            Reconnect
-        </button>
+        <div class="flex items-center justify-between">
+            <span class="text-sm">Session will be preserved</span>
+            <button id="manual-reconnect-btn" class="bg-white text-orange-600 px-3 py-1 rounded text-sm font-medium hover:bg-gray-100 transition">
+                Reconnect Now
+            </button>
+        </div>
     `;
-
         document.body.appendChild(notification);
 
         // Add event listener to the reconnect button
-        document.getElementById('reconnect-btn').addEventListener('click', () => {
-            reconnectToSession();
+        document.getElementById('manual-reconnect-btn').addEventListener('click', () => {
+            if (socket) {
+                socket.connect();
+            }
             notification.remove();
         });
+
+        // Auto-remove after successful reconnection
+        const checkConnection = setInterval(() => {
+            if (socket && socket.connected) {
+                notification.remove();
+                clearInterval(checkConnection);
+            }
+        }, 1000);
     }
 
     function reconnectToSession() {
@@ -1125,8 +1184,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Vote value section
             const voteValue = document.createElement('div');
             voteValue.className = `flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${vote === '?'
-                    ? 'bg-gray-700 text-gray-300'
-                    : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-gray-900'
+                ? 'bg-gray-700 text-gray-300'
+                : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-gray-900'
                 }`;
             voteValue.textContent = vote;
 

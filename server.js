@@ -7,7 +7,16 @@ const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    },
+    // Socket.IO configuration for longer sessions
+    pingTimeout: 60000,        // 60 seconds
+    pingInterval: 25000,       // 25 seconds
+    connectTimeout: 45000,     // 45 seconds
+});
 
 // Increase payload size limit
 app.use(express.json({ limit: '10mb' }));
@@ -147,19 +156,40 @@ function calculateResults(votes) {
 }
 
 // Heartbeat mechanism to detect disconnected users
+// More lenient heartbeat mechanism
 setInterval(() => {
     Object.keys(sessions).forEach(sessionId => {
         const session = sessions[sessionId];
         Object.keys(session.users).forEach(userId => {
             const user = session.users[userId];
-            if (user.isConnected && user.lastHeartbeat && Date.now() - user.lastHeartbeat > 30000) {
-                console.log(`User ${user.name} (${userId}) timed out`);
+            // Only mark as disconnected if no heartbeat for 30 minutes
+            if (user.isConnected && user.lastHeartbeat &&
+                Date.now() - user.lastHeartbeat > 1800000) { // 30 minutes in milliseconds
+                console.log(`User ${user.name} (${userId}) timed out after 30 minutes`);
                 user.isConnected = false;
                 io.to(sessionId).emit('user-disconnected', userId);
             }
         });
     });
-}, 10000);
+}, 60000); // Check every minute instead of every 10 seconds
+
+// Session cleanup - remove inactive sessions after 24 hours
+setInterval(() => {
+    const now = Date.now();
+    Object.keys(sessions).forEach(sessionId => {
+        const session = sessions[sessionId];
+        // Check if session has any active users
+        const hasActiveUsers = Object.values(session.users).some(user =>
+            user.isConnected && (now - user.lastHeartbeat) < 1800000
+        );
+
+        // Remove session if no active users for 24 hours
+        if (!hasActiveUsers && (now - session.lastActivity) > 86400000) { // 24 hours
+            console.log(`Removing inactive session: ${sessionId}`);
+            delete sessions[sessionId];
+        }
+    });
+}, 3600000); // Check every hour
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -184,15 +214,18 @@ io.on('connection', (socket) => {
                 id: sessionId,
                 users: {},
                 votes: {},
-                // Set Modified Fibonacci as default
                 currentDeck: 'modifiedFibonacci',
                 showVotes: false,
-                gameActive: false
+                gameActive: false,
+                lastActivity: Date.now() // Track session activity
             };
             console.log('Created new session:', sessionId);
         }
 
-        // Add user to session (avatar is now just a path, not base64 data)
+        // Update session activity
+        sessions[sessionId].lastActivity = Date.now();
+
+        // Add user to session
         sessions[sessionId].users[socket.id] = {
             ...user,
             id: socket.id,
@@ -202,7 +235,6 @@ io.on('connection', (socket) => {
 
         // Join socket room
         socket.join(sessionId);
-
         console.log(`User ${user.name} (${socket.id}) joined session ${sessionId}`);
 
         // Send session data to client
