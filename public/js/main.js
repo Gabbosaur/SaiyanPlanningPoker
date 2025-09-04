@@ -577,15 +577,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             participantsContainer.appendChild(participantEl);
         });
-
-        // Add a subtle animation to the table when users join/leave
-        const table = document.querySelector('.dbz-table');
-        if (table) {
-            table.style.transform = 'scale(1.02)';
-            setTimeout(() => {
-                table.style.transform = 'scale(1)';
-            }, 300);
-        }
     }
 
     // Enhanced function to animate collision between users (local)
