@@ -1222,16 +1222,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helper function to show notifications
     function showNotification(message, type = 'info') {
         const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500' :
+        notification.className = `fixed top-1 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500' :
             type === 'error' ? 'bg-red-500' : 'bg-blue-500'
             } text-white`;
         notification.textContent = message;
         document.body.appendChild(notification);
 
-        // Remove notification after 3 seconds
+        // Remove notification after 1.5 seconds
         setTimeout(() => {
             notification.remove();
-        }, 3000);
+        }, 1500);
     }
 
     // New function to create the vote chart
