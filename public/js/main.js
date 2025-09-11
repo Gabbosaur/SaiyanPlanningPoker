@@ -1350,6 +1350,19 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Voting UI reset complete');
     }
 
+    // Settings modal
+    settingsBtn.addEventListener('click', () => {
+        settingsModal.classList.remove('hidden');
+        soundToggle.checked = soundEnabled;
+        themeSelector.value = currentTheme;
+        deckSelector.value = currentDeckType;
+
+        // Update avatar preview
+        if (user.avatar) {
+            settingsAvatarPreview.innerHTML = `<img src="${user.avatar}" alt="Avatar" class="w-full h-full object-cover">`;
+        }
+    });
+
     closeSettings.addEventListener('click', () => {
         settingsModal.classList.add('hidden');
     });
