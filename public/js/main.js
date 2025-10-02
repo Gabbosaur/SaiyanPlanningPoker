@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let avatarFile = null;
     let heartbeatInterval = null;
     let isAnimating = false;
+    let currentSession = null; // Added to track current session state
 
     // Audio for celebration with error handling
     const celebrationSound = new Audio('/sounds/super-saiyan.mp3');
@@ -287,6 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
             gameScreen.classList.remove('hidden');
             sessionIdDisplay.textContent = sessionId;
 
+            // Store the current session globally
+            currentSession = session;
+
             // Set current deck type and display
             currentDeckType = session.currentDeck;
             currentDeck.textContent = currentDeckType === 'fibonacci' ? 'Fibonacci' :
@@ -337,21 +341,37 @@ document.addEventListener('DOMContentLoaded', () => {
             voteStatus.textContent = 'All votes in! Revealing results...';
         });
 
+        // Update the vote-updated event handler
         socket.on('vote-updated', (data) => {
-            const { userId, vote } = data;
+            const { userId, vote, voterName } = data;
 
-            // Only show the vote if it's the current user's vote
-            if (userId === socket.id) {
-                const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
-                if (participantEl) {
-                    const voteIndicator = participantEl.querySelector('.vote-indicator');
-                    if (voteIndicator) {
-                        voteIndicator.classList.remove('hidden');
-                        voteIndicator.querySelector('.dbz-vote-card').textContent = vote;
-                    }
+            // Find the participant element
+            const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
+            if (participantEl) {
+                const voteIndicator = participantEl.querySelector('.vote-indicator');
+                if (voteIndicator) {
+                    // Show the vote indicator but hide the vote value
+                    voteIndicator.classList.remove('hidden');
+                    voteIndicator.querySelector('.dbz-vote-card').textContent = '?';
+
+                    // Add a visual indicator that this user has voted
+                    participantEl.classList.add('user-has-voted');
+
+                    // // Add a subtle animation to draw attention
+                    // voteIndicator.classList.add('animate-pulse-once');
+                    // setTimeout(() => {
+                    //     voteIndicator.classList.remove('animate-pulse-once');
+                    // }, 1000);
                 }
+            }
 
-                // Update card selection visual for the current user
+            // // Show a notification that someone voted (optional)
+            // if (userId !== socket.id) {
+            //     showVoteNotification(voterName);
+            // }
+
+            // Update card selection visual for the current user
+            if (userId === socket.id) {
                 document.querySelectorAll('.dbz-card-btn').forEach(card => {
                     card.classList.remove('ring-2', 'ring-yellow-400');
                     if (card.textContent === vote) {
@@ -361,13 +381,77 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Update the voting-complete event handler
+        socket.on('voting-complete', (data) => {
+            const { votes, results } = data;
+
+            // Update the current session state
+            if (currentSession) {
+                currentSession.showVotes = true;
+                currentSession.results = results;
+            }
+
+            // Update vote counter to show the correct total
+            const totalVotes = Object.keys(votes).length;
+            const totalConnected = Object.values(participants).filter(p => p.isConnected).length;
+            voteCounter.textContent = `${totalVotes}/${totalConnected} votes`;
+
+            // Show all vote values now that voting is complete
+            Object.keys(votes).forEach(userId => {
+                const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
+                if (participantEl) {
+                    const voteIndicator = participantEl.querySelector('.vote-indicator');
+                    if (voteIndicator) {
+                        voteIndicator.classList.remove('hidden');
+                        voteIndicator.querySelector('.dbz-vote-card').textContent = votes[userId];
+
+                        // Add animation to reveal the vote
+                        voteIndicator.classList.add('reveal-vote');
+                        setTimeout(() => {
+                            voteIndicator.classList.remove('reveal-vote');
+                        }, 500);
+                    }
+                }
+            });
+
+            // Show results (which will reveal all votes)
+            showResults(votes, results);
+
+            // Disable all cards to prevent further voting
+            document.querySelectorAll('.dbz-card-btn').forEach(card => {
+                card.disabled = true;
+                card.classList.add('opacity-50', 'cursor-not-allowed');
+            });
+        });
+
+        // Update the votes-reset event handler
+        socket.on('votes-reset', () => {
+            console.log('Received votes-reset event from server');
+            resetVoting();
+
+            // Update the current session state
+            if (currentSession) {
+                currentSession.votes = {};
+                currentSession.showVotes = false;
+                currentSession.results = {};
+            }
+
+            // Show a notification that voting has been reset
+            showNotification('Voting has been reset! You can now vote again.', 'success');
+        });
+
         socket.on('vote-count-updated', (data) => {
             const { current, total } = data;
             voteCounter.textContent = `${current}/${total} votes`;
-            if (current === total) {
+
+            // Update status text with more context
+            if (current === 0) {
+                voteStatus.textContent = 'Waiting for votes...';
+            } else if (current === total) {
                 voteStatus.textContent = 'All votes in! Revealing results...';
             } else {
-                voteStatus.textContent = 'Waiting for votes...';
+                const remaining = total - current;
+                voteStatus.textContent = `${remaining} more to vote...`;
             }
         });
 
@@ -378,6 +462,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalVotes = Object.keys(votes).length;
             const totalConnected = Object.values(participants).filter(p => p.isConnected).length;
             voteCounter.textContent = `${totalVotes}/${totalConnected} votes`;
+
+            // Show all vote values now that voting is complete
+            Object.keys(votes).forEach(userId => {
+                const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
+                if (participantEl) {
+                    const voteIndicator = participantEl.querySelector('.vote-indicator');
+                    if (voteIndicator) {
+                        voteIndicator.classList.remove('hidden');
+                        voteIndicator.querySelector('.dbz-vote-card').textContent = votes[userId];
+
+                        // Add animation to reveal the vote
+                        voteIndicator.classList.add('reveal-vote');
+                        setTimeout(() => {
+                            voteIndicator.classList.remove('reveal-vote');
+                        }, 500);
+                    }
+                }
+            });
 
             // Show results (which will reveal all votes)
             showResults(votes, results);
@@ -529,10 +631,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Position participants in an oval
         participantIds.forEach((id, index) => {
             const participant = participants[id];
-
             // Calculate angle for even distribution
             const angle = (index / totalParticipants) * 2 * Math.PI - Math.PI / 2; // Start from top
-
             // Calculate position on oval
             const x = centerX + Math.cos(angle) * adjustedRadiusX;
             const y = centerY + Math.sin(angle) * adjustedRadiusY;
@@ -571,12 +671,54 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="text-center mt-1 text-xs font-medium participant-name pointer-events-none">${participant.name}</div>
             <div class="vote-indicator hidden text-center mt-1 pointer-events-none">
-                <div class="dbz-vote-card inline-block px-2 py-1 rounded-lg font-bold">?</div>
+                <div class="dbz-vote-card inline-block px-3 py-1 rounded-lg font-bold">?</div>
             </div>
         `;
 
+            // Check if this user has voted and add the appropriate class
+            if (currentSession && currentSession.votes && currentSession.votes[id]) {
+                participantEl.classList.add('user-has-voted');
+                const voteIndicator = participantEl.querySelector('.vote-indicator');
+                if (voteIndicator) {
+                    voteIndicator.classList.remove('hidden');
+                    // Only show vote value if voting is complete
+                    if (currentSession.showVotes) {
+                        voteIndicator.querySelector('.dbz-vote-card').textContent = currentSession.votes[id];
+                    } else {
+                        voteIndicator.querySelector('.dbz-vote-card').textContent = '?';
+                    }
+                }
+            }
+
             participantsContainer.appendChild(participantEl);
         });
+
+        // Add a subtle animation to the table when users join/leave
+        const table = document.querySelector('.dbz-table');
+        if (table) {
+            table.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                table.style.transform = 'scale(1)';
+            }, 300);
+        }
+    }
+
+    function showVoteNotification(voterName) {
+        // Create a subtle notification
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg shadow-lg z-40 transition-all duration-300';
+        notification.textContent = `${voterName} has voted`;
+
+        document.body.appendChild(notification);
+
+        // Remove after 2 seconds
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translate(-50%, 10px)';
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 2000);
     }
 
     // Enhanced function to animate collision between users (local)
@@ -1093,6 +1235,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (voteIndicator) {
                     voteIndicator.classList.remove('hidden');
                     voteIndicator.querySelector('.dbz-vote-card').textContent = votes[userId];
+
+                    // Add animation to reveal the vote
+                    voteIndicator.classList.add('reveal-vote');
+                    setTimeout(() => {
+                        voteIndicator.classList.remove('reveal-vote');
+                    }, 500);
                 }
             }
         });
@@ -1325,10 +1473,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset voting
     function resetVoting() {
         console.log('Resetting voting UI');
-
         hasVoted = false;
         cardsContainer.classList.remove('hidden');
         resultsArea.classList.add('hidden');
+
+        // Clear the current session data
+        if (currentSession) {
+            currentSession.votes = {};
+            currentSession.showVotes = false;
+            currentSession.results = {};
+        }
 
         // Clear the chart
         voteChart.innerHTML = '';
@@ -1339,14 +1493,19 @@ document.addEventListener('DOMContentLoaded', () => {
             card.classList.remove('opacity-50', 'cursor-not-allowed', 'ring-2', 'ring-yellow-400');
         });
 
-        // Hide all vote indicators
+        // Hide all vote indicators and remove voted class
         document.querySelectorAll('.vote-indicator').forEach(indicator => {
             indicator.classList.add('hidden');
+            indicator.querySelector('.dbz-vote-card').textContent = '?';
+        });
+
+        // Remove the 'has-voted' class from all participants
+        document.querySelectorAll('.user-has-voted').forEach(el => {
+            el.classList.remove('user-has-voted');
         });
 
         voteStatus.textContent = 'Waiting for votes...';
         voteCounter.textContent = '0/0 votes';
-
         console.log('Voting UI reset complete');
     }
 

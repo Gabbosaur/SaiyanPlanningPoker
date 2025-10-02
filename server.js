@@ -289,7 +289,6 @@ io.on('connection', (socket) => {
 
         // Don't allow vote changes if voting is complete
         if (session.showVotes) {
-            // Optionally notify the user that voting is closed
             socket.emit('voting-closed');
             return;
         }
@@ -297,16 +296,16 @@ io.on('connection', (socket) => {
         // Update or create the vote for this user
         session.votes[socket.id] = vote;
 
-        // Emit the updated vote to all clients
+        // Broadcast the updated vote to ALL clients (not just the current user)
         io.to(sessionId).emit('vote-updated', {
             userId: socket.id,
-            vote: vote
+            vote: vote,
+            voterName: session.users[socket.id]?.name || 'Unknown'
         });
 
         // Update vote count
         const connectedUsers = Object.values(session.users).filter(user => user.isConnected);
         const votesCount = Object.keys(session.votes).length;
-
         io.to(sessionId).emit('vote-count-updated', {
             current: votesCount,
             total: connectedUsers.length

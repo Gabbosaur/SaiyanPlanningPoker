@@ -523,6 +523,93 @@
     flex-shrink: 0;
 }
 
+/* Vote indicator for users who have voted */
+.user-has-voted .dbz-participant-card {
+    border-color: rgba(249, 215, 28, 0.8) !important;
+    box-shadow: 0 0 10px rgba(249, 215, 28, 0.3);
+}
+
+.user-has-voted .dbz-participant-card::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 12px;
+    height: 12px;
+    background-color: #f9d71c;
+    border-radius: 50%;
+    border: 2px solid #1a1a2e;
+    box-shadow: 0 0 8px rgba(249, 215, 28, 0.5);
+}
+
+/* Vote indicator styling */
+.vote-indicator .dbz-vote-card {
+    background: linear-gradient(135deg, #2a3f5f 0%, #1a2a4a 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(249, 215, 28, 0.5);
+}
+
+/* Animation for when someone votes */
+.animate-pulse-once {
+    animation: pulse-once 1s ease-out;
+}
+
+@keyframes pulse-once {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(249, 215, 28, 0.7);
+    }
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 8px rgba(249, 215, 28, 0.8);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(249, 215, 28, 0.7);
+    }
+}
+
+/* Animation for revealing votes */
+.reveal-vote {
+    animation: reveal-vote 0.5s ease-out;
+}
+
+@keyframes reveal-vote {
+    0% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+        box-shadow: 0 0 15px rgba(249, 215, 28, 0.6);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+        box-shadow: 0 2px 8px rgba(249, 215, 28, 0.4);
+    }
+}
+
+/* Notification styling */
+.vote-notification {
+    animation: slide-up 0.3s ease-out;
+    color: #1a1a2e;
+    border: 1px solid rgba(249, 215, 28, 0.3);
+}
+
+@keyframes slide-up {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
 /* Animations */
 @keyframes border-pulse {
 
@@ -1082,7 +1169,6 @@
     left: -2px;
     right: -2px;
     bottom: -2px;
-    background: linear-gradient(45deg, #f9d71c, #ff9500, #f9d71c);
     border-radius: 50%;
     z-index: -1;
     opacity: 0.7;
