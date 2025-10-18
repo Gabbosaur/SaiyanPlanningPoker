@@ -635,16 +635,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const radiusY = 140; // Vertical radius (shorter)
 
         // Adjust oval dimensions based on number of participants
-        // Position participants closer to the table for better visibility
-        let adjustedRadiusX = radiusX + 20; // Closer to table edge (was 40px)
-        let adjustedRadiusY = radiusY + 15; // Closer to table edge (was 25px)
+        let adjustedRadiusX = radiusX;
+        let adjustedRadiusY = radiusY;
 
         if (totalParticipants >= 8) {
-            adjustedRadiusX = radiusX + 30; // More space for more participants (was 60px)
-            adjustedRadiusY = radiusY + 20; // (was 40px)
+            adjustedRadiusX = radiusX + 20;
+            adjustedRadiusY = radiusY + 15;
         } else if (totalParticipants >= 6) {
-            adjustedRadiusX = radiusX + 25; // (was 50px)
-            adjustedRadiusY = radiusY + 18; // (was 35px)
+            adjustedRadiusX = radiusX + 10;
+            adjustedRadiusY = radiusY + 8;
         }
 
         // Adjust radius based on screen size
@@ -656,20 +655,11 @@ document.addEventListener('DOMContentLoaded', () => {
             adjustedRadiusY *= 0.8;
         }
 
-        // Position participants in an oval, avoiding the bottom area where cards are
+        // Position participants in an oval
         participantIds.forEach((id, index) => {
             const participant = participants[id];
-            
-            // Calculate angle for even distribution, but avoid bottom area (where cards are)
-            let angle;
-            if (totalParticipants <= 4) {
-                // For 4 or fewer participants, position them in top 3/4 of the oval
-                angle = (index / totalParticipants) * 1.5 * Math.PI - Math.PI / 2; // Top 3/4 only
-            } else {
-                // For more participants, use full oval but with better distribution
-                angle = (index / totalParticipants) * 2 * Math.PI - Math.PI / 2; // Start from top
-            }
-            
+            // Calculate angle for even distribution
+            const angle = (index / totalParticipants) * 2 * Math.PI - Math.PI / 2; // Start from top
             // Calculate position on oval
             const x = centerX + Math.cos(angle) * adjustedRadiusX;
             const y = centerY + Math.sin(angle) * adjustedRadiusY;
