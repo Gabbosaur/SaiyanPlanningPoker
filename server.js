@@ -157,38 +157,52 @@ function calculateResults(votes) {
 
 // Heartbeat mechanism to detect disconnected users
 // More lenient heartbeat mechanism
-setInterval(() => {
-    Object.keys(sessions).forEach(sessionId => {
-        const session = sessions[sessionId];
-        Object.keys(session.users).forEach(userId => {
-            const user = session.users[userId];
-            // Only mark as disconnected if no heartbeat for 30 minutes
-            if (user.isConnected && user.lastHeartbeat &&
-                Date.now() - user.lastHeartbeat > 1800000) { // 30 minutes in milliseconds
-                console.log(`User ${user.name} (${userId}) timed out after 30 minutes`);
-                user.isConnected = false;
-                io.to(sessionId).emit('user-disconnected', userId);
-            }
+let heartbeatInterval = setInterval(() => {
+    try {
+        Object.keys(sessions).forEach(sessionId => {
+            const session = sessions[sessionId];
+            if (!session || !session.users) return;
+            
+            Object.keys(session.users).forEach(userId => {
+                const user = session.users[userId];
+                if (!user) return;
+                
+                // Only mark as disconnected if no heartbeat for 30 minutes
+                if (user.isConnected && user.lastHeartbeat &&
+                    Date.now() - user.lastHeartbeat > 1800000) { // 30 minutes in milliseconds
+                    console.log(`User ${user.name} (${userId}) timed out after 30 minutes`);
+                    user.isConnected = false;
+                    io.to(sessionId).emit('user-disconnected', userId);
+                }
+            });
         });
-    });
+    } catch (error) {
+        console.error('Error in heartbeat mechanism:', error);
+    }
 }, 60000); // Check every minute instead of every 10 seconds
 
 // Session cleanup - remove inactive sessions after 24 hours
-setInterval(() => {
-    const now = Date.now();
-    Object.keys(sessions).forEach(sessionId => {
-        const session = sessions[sessionId];
-        // Check if session has any active users
-        const hasActiveUsers = Object.values(session.users).some(user =>
-            user.isConnected && (now - user.lastHeartbeat) < 1800000
-        );
+let sessionCleanupInterval = setInterval(() => {
+    try {
+        const now = Date.now();
+        Object.keys(sessions).forEach(sessionId => {
+            const session = sessions[sessionId];
+            if (!session || !session.users) return;
+            
+            // Check if session has any active users
+            const hasActiveUsers = Object.values(session.users).some(user =>
+                user && user.isConnected && (now - user.lastHeartbeat) < 1800000
+            );
 
-        // Remove session if no active users for 24 hours
-        if (!hasActiveUsers && (now - session.lastActivity) > 86400000) { // 24 hours
-            console.log(`Removing inactive session: ${sessionId}`);
-            delete sessions[sessionId];
-        }
-    });
+            // Remove session if no active users for 24 hours
+            if (!hasActiveUsers && (now - session.lastActivity) > 86400000) { // 24 hours
+                console.log(`Removing inactive session: ${sessionId}`);
+                delete sessions[sessionId];
+            }
+        });
+    } catch (error) {
+        console.error('Error in session cleanup:', error);
+    }
 }, 3600000); // Check every hour
 
 // Socket.io connection handling
@@ -206,45 +220,68 @@ io.on('connection', (socket) => {
 
     // Create or join a session
     socket.on('join-session', (data) => {
-        const { sessionId, user } = data;
+        try {
+            const { sessionId, user } = data;
 
-        // Initialize session if it doesn't exist
-        if (!sessions[sessionId]) {
-            sessions[sessionId] = {
-                id: sessionId,
-                users: {},
-                votes: {},
-                currentDeck: 'modifiedFibonacci',
-                showVotes: false,
-                gameActive: false,
-                lastActivity: Date.now() // Track session activity
+            // Validate input
+            if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 50) {
+                socket.emit('error', { message: 'Invalid session ID' });
+                return;
+            }
+
+            if (!user || !user.name || typeof user.name !== 'string' || user.name.length > 100) {
+                socket.emit('error', { message: 'Invalid user data' });
+                return;
+            }
+
+            // Sanitize user name
+            user.name = user.name.replace(/[<>\"']/g, '').trim();
+            if (!user.name) {
+                socket.emit('error', { message: 'User name cannot be empty' });
+                return;
+            }
+
+            // Initialize session if it doesn't exist
+            if (!sessions[sessionId]) {
+                sessions[sessionId] = {
+                    id: sessionId,
+                    users: {},
+                    votes: {},
+                    currentDeck: 'modifiedFibonacci',
+                    showVotes: false,
+                    gameActive: false,
+                    lastActivity: Date.now() // Track session activity
+                };
+                console.log('Created new session:', sessionId);
+            }
+
+            // Update session activity
+            sessions[sessionId].lastActivity = Date.now();
+
+            // Add user to session
+            sessions[sessionId].users[socket.id] = {
+                ...user,
+                id: socket.id,
+                isConnected: true,
+                lastHeartbeat: Date.now()
             };
-            console.log('Created new session:', sessionId);
+
+            // Join socket room
+            socket.join(sessionId);
+            console.log(`User ${user.name} (${socket.id}) joined session ${sessionId}`);
+
+            // Send session data to client
+            socket.emit('session-joined', {
+                session: sessions[sessionId],
+                cardDecks
+            });
+
+            // Notify other users
+            socket.to(sessionId).emit('user-joined', sessions[sessionId].users[socket.id]);
+        } catch (error) {
+            console.error('Error in join-session:', error);
+            socket.emit('error', { message: 'Failed to join session' });
         }
-
-        // Update session activity
-        sessions[sessionId].lastActivity = Date.now();
-
-        // Add user to session
-        sessions[sessionId].users[socket.id] = {
-            ...user,
-            id: socket.id,
-            isConnected: true,
-            lastHeartbeat: Date.now()
-        };
-
-        // Join socket room
-        socket.join(sessionId);
-        console.log(`User ${user.name} (${socket.id}) joined session ${sessionId}`);
-
-        // Send session data to client
-        socket.emit('session-joined', {
-            session: sessions[sessionId],
-            cardDecks
-        });
-
-        // Notify other users
-        socket.to(sessionId).emit('user-joined', sessions[sessionId].users[socket.id]);
     });
 
     // Handle user disconnect
@@ -284,53 +321,77 @@ io.on('connection', (socket) => {
 
     // Handle vote submission
     socket.on('submit-vote', (data) => {
-        const { sessionId, vote } = data;
-        const session = sessions[sessionId];
+        try {
+            const { sessionId, vote } = data;
+            const session = sessions[sessionId];
 
-        // Don't allow vote changes if voting is complete
-        if (session.showVotes) {
-            socket.emit('voting-closed');
-            return;
-        }
+            // Validate session exists
+            if (!session) {
+                socket.emit('error', { message: 'Session not found' });
+                return;
+            }
 
-        // Update or create the vote for this user
-        session.votes[socket.id] = vote;
+            // Validate user is in session
+            if (!session.users[socket.id]) {
+                socket.emit('error', { message: 'User not in session' });
+                return;
+            }
 
-        // Broadcast the updated vote to ALL clients (not just the current user)
-        io.to(sessionId).emit('vote-updated', {
-            userId: socket.id,
-            vote: vote,
-            voterName: session.users[socket.id]?.name || 'Unknown'
-        });
+            // Validate vote value
+            const currentDeck = cardDecks[session.currentDeck];
+            if (!currentDeck || !currentDeck.includes(vote)) {
+                socket.emit('error', { message: 'Invalid vote value' });
+                return;
+            }
 
-        // Update vote count
-        const connectedUsers = Object.values(session.users).filter(user => user.isConnected);
-        const votesCount = Object.keys(session.votes).length;
-        io.to(sessionId).emit('vote-count-updated', {
-            current: votesCount,
-            total: connectedUsers.length
-        });
+            // Don't allow vote changes if voting is complete
+            if (session.showVotes) {
+                socket.emit('voting-closed');
+                return;
+            }
 
-        // Check if all connected users have voted
-        if (votesCount === connectedUsers.length) {
-            // Calculate results
-            const voteValues = Object.values(session.votes).filter(vote => vote !== '?');
-            const results = calculateResults(voteValues);
+            // Update or create the vote for this user
+            session.votes[socket.id] = vote;
 
-            // Mark session as showing votes
-            session.showVotes = true;
-            session.results = results;
-
-            // Emit voting complete event
-            io.to(sessionId).emit('voting-complete', {
-                votes: session.votes,
-                results: results
+            // Broadcast the updated vote to ALL clients (not just the current user)
+            io.to(sessionId).emit('vote-updated', {
+                userId: socket.id,
+                vote: vote,
+                voterName: session.users[socket.id]?.name || 'Unknown'
             });
 
-            // Check for consensus and trigger celebration
-            if (results.consensus) {
-                io.to(sessionId).emit('celebrate-consensus');
+            // Update vote count
+            const connectedUsers = Object.values(session.users).filter(user => user.isConnected);
+            const votesCount = Object.keys(session.votes).length;
+            io.to(sessionId).emit('vote-count-updated', {
+                current: votesCount,
+                total: connectedUsers.length
+            });
+
+            // Check if all connected users have voted
+            if (votesCount === connectedUsers.length) {
+                // Calculate results
+                const voteValues = Object.values(session.votes).filter(vote => vote !== '?');
+                const results = calculateResults(voteValues);
+
+                // Mark session as showing votes
+                session.showVotes = true;
+                session.results = results;
+
+                // Emit voting complete event
+                io.to(sessionId).emit('voting-complete', {
+                    votes: session.votes,
+                    results: results
+                });
+
+                // Check for consensus and trigger celebration
+                if (results.consensus) {
+                    io.to(sessionId).emit('celebrate-consensus');
+                }
             }
+        } catch (error) {
+            console.error('Error in submit-vote:', error);
+            socket.emit('error', { message: 'Failed to submit vote' });
         }
     });
 
@@ -429,6 +490,43 @@ io.on('connection', (socket) => {
                 targetName: sessions[sessionId].users[targetId]?.name || 'Unknown'
             });
         }
+    });
+});
+
+// Graceful shutdown handling
+process.on('SIGINT', () => {
+    console.log('\nShutting down server gracefully...');
+    
+    // Clear intervals
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+    }
+    if (sessionCleanupInterval) {
+        clearInterval(sessionCleanupInterval);
+    }
+    
+    // Close server
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', () => {
+    console.log('\nShutting down server gracefully...');
+    
+    // Clear intervals
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+    }
+    if (sessionCleanupInterval) {
+        clearInterval(sessionCleanupInterval);
+    }
+    
+    // Close server
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
     });
 });
 

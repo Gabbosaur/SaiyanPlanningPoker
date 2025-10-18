@@ -253,6 +253,17 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsAvatarUpload.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
+            // Validate file type and size
+            if (!file.type.startsWith('image/')) {
+                showNotification('Please select an image file', 'error');
+                return;
+            }
+            
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                showNotification('Image file is too large. Please select a file smaller than 5MB', 'error');
+                return;
+            }
+            
             // Upload avatar
             try {
                 const formData = new FormData();
@@ -261,20 +272,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     body: formData
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 if (data.path) {
                     user.avatar = data.path;
                     settingsAvatarPreview.innerHTML = `<img src="${data.path}" alt="Avatar" class="w-full h-full object-cover">`;
                     // Update avatar in the current session if already joined
-                    if (socket && sessionId) {
+                    if (socket && sessionId && socket.connected) {
                         socket.emit('update-avatar', {
                             sessionId,
                             avatarPath: data.path
                         });
                     }
+                    showNotification('Avatar updated successfully!', 'success');
+                } else {
+                    throw new Error('No path returned from server');
                 }
             } catch (error) {
                 console.error('Error uploading avatar:', error);
+                showNotification('Failed to upload avatar. Please try again.', 'error');
             }
         }
     });
@@ -539,7 +559,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('connect_error', (error) => {
             console.error('Connection error:', error);
-            alert('Failed to connect to the server. Please try again.');
+            updateConnectionStatus('disconnected');
+            showNotification('Failed to connect to the server. Please try again.', 'error');
         });
 
         socket.on('disconnect', (reason) => {
@@ -590,6 +611,12 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('reconnect_failed', () => {
             updateConnectionStatus('disconnected');
         });
+
+        // Handle server errors
+        socket.on('error', (data) => {
+            console.error('Server error:', data.message);
+            showNotification(data.message || 'An error occurred', 'error');
+        });
     }
 
     // Render participants around the table
@@ -608,15 +635,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const radiusY = 140; // Vertical radius (shorter)
 
         // Adjust oval dimensions based on number of participants
-        let adjustedRadiusX = radiusX;
-        let adjustedRadiusY = radiusY;
+        // Position participants closer to the table for better visibility
+        let adjustedRadiusX = radiusX + 20; // Closer to table edge (was 40px)
+        let adjustedRadiusY = radiusY + 15; // Closer to table edge (was 25px)
 
         if (totalParticipants >= 8) {
-            adjustedRadiusX = radiusX + 20;
-            adjustedRadiusY = radiusY + 15;
+            adjustedRadiusX = radiusX + 30; // More space for more participants (was 60px)
+            adjustedRadiusY = radiusY + 20; // (was 40px)
         } else if (totalParticipants >= 6) {
-            adjustedRadiusX = radiusX + 10;
-            adjustedRadiusY = radiusY + 8;
+            adjustedRadiusX = radiusX + 25; // (was 50px)
+            adjustedRadiusY = radiusY + 18; // (was 35px)
         }
 
         // Adjust radius based on screen size
@@ -628,11 +656,20 @@ document.addEventListener('DOMContentLoaded', () => {
             adjustedRadiusY *= 0.8;
         }
 
-        // Position participants in an oval
+        // Position participants in an oval, avoiding the bottom area where cards are
         participantIds.forEach((id, index) => {
             const participant = participants[id];
-            // Calculate angle for even distribution
-            const angle = (index / totalParticipants) * 2 * Math.PI - Math.PI / 2; // Start from top
+            
+            // Calculate angle for even distribution, but avoid bottom area (where cards are)
+            let angle;
+            if (totalParticipants <= 4) {
+                // For 4 or fewer participants, position them in top 3/4 of the oval
+                angle = (index / totalParticipants) * 1.5 * Math.PI - Math.PI / 2; // Top 3/4 only
+            } else {
+                // For more participants, use full oval but with better distribution
+                angle = (index / totalParticipants) * 2 * Math.PI - Math.PI / 2; // Start from top
+            }
+            
             // Calculate position on oval
             const x = centerX + Math.cos(angle) * adjustedRadiusX;
             const y = centerY + Math.sin(angle) * adjustedRadiusY;
@@ -758,13 +795,18 @@ document.addEventListener('DOMContentLoaded', () => {
         attackerEl.classList.add('animate-smooth-punch');
 
         // Play punch sound with slight delay for impact timing
-        if (soundEnabled) {
+        if (soundEnabled && punchSound) {
             setTimeout(() => {
-                const playPromise = punchSound.cloneNode(true).play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.warn('Error playing punch sound:', error);
-                    });
+                try {
+                    const punchSoundClone = punchSound.cloneNode(true);
+                    const playPromise = punchSoundClone.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.warn('Error playing punch sound:', error);
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Error creating punch sound clone:', error);
                 }
             }, 600); // Time to reach the target (50% of 1.2s)
         }
@@ -853,13 +895,18 @@ document.addEventListener('DOMContentLoaded', () => {
         attackerEl.classList.add('animate-smooth-punch');
 
         // Play punch sound with slight delay for impact timing
-        if (soundEnabled) {
+        if (soundEnabled && punchSound) {
             setTimeout(() => {
-                const playPromise = punchSound.cloneNode(true).play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.warn('Error playing punch sound:', error);
-                    });
+                try {
+                    const punchSoundClone = punchSound.cloneNode(true);
+                    const playPromise = punchSoundClone.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.warn('Error playing punch sound:', error);
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Error creating punch sound clone:', error);
                 }
             }, 600); // Time to reach the target (50% of 1.2s)
         }
@@ -1309,7 +1356,10 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarContainer.className = 'w-10 h-10 rounded-full overflow-hidden bg-gray-700 border border-gray-600 flex-shrink-0';
 
             if (participant?.avatar) {
-                avatarContainer.innerHTML = `<img src="${participant.avatar}" alt="${participant.name}" class="w-full h-full object-cover">`;
+                // Sanitize avatar path and name to prevent XSS
+                const sanitizedAvatar = participant.avatar.replace(/[<>\"']/g, '');
+                const sanitizedName = participant.name.replace(/[<>\"']/g, '');
+                avatarContainer.innerHTML = `<img src="${sanitizedAvatar}" alt="${sanitizedName}" class="w-full h-full object-cover">`;
             } else {
                 avatarContainer.innerHTML = '<i class="fas fa-user text-gray-500 w-full h-full flex items-center justify-center"></i>';
             }
@@ -1518,7 +1568,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update avatar preview
         if (user.avatar) {
-            settingsAvatarPreview.innerHTML = `<img src="${user.avatar}" alt="Avatar" class="w-full h-full object-cover">`;
+            // Sanitize avatar path to prevent XSS
+            const sanitizedAvatar = user.avatar.replace(/[<>\"']/g, '');
+            settingsAvatarPreview.innerHTML = `<img src="${sanitizedAvatar}" alt="Avatar" class="w-full h-full object-cover">`;
         }
     });
 
@@ -2189,6 +2241,32 @@ document.addEventListener('DOMContentLoaded', () => {
             // Start the animation
             messagePanel.classList.add('animate-in');
         }
+    }
+
+    // Add cleanup function for better memory management
+    function cleanup() {
+        // Stop all intervals
+        stopHeartbeat();
+        stopConnectionCheck();
+        
+        // Disconnect socket
+        if (socket) {
+            socket.disconnect();
+            socket = null;
+        }
+        
+        // Clear any remaining timeouts
+        if (window.resizeTimer) {
+            clearTimeout(window.resizeTimer);
+        }
+        
+        // Reset state
+        isAnimating = false;
+        isReconnecting = false;
+        hasVoted = false;
+        participants = {};
+        currentCards = [];
+        currentSession = null;
     }
 
     // You can call this function whenever you want to re-animate the panel
