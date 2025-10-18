@@ -1175,14 +1175,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startConnectionCheck();
 
-    // Load voting cards
+    // Load voting cards with dealing animation
     function loadCards(cards) {
         currentCards = cards;
         cardsContainer.innerHTML = '';
 
-        cards.forEach(card => {
+        cards.forEach((card, index) => {
             const cardEl = document.createElement('button');
-            cardEl.className = 'dbz-card-btn rounded-lg shadow-lg transform transition-all duration-200';
+            cardEl.className = 'dbz-card-btn rounded-lg shadow-lg transform transition-all duration-200 card-dealing';
 
             // Add special class for longer text values
             if (card.length > 2 || card === 'XXL' || card === 'XXXL') {
@@ -1191,7 +1191,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             cardEl.textContent = card;
             cardEl.addEventListener('click', () => submitVote(card));
+            cardEl.style.animationDelay = `${index * 0.5}s`;
             cardsContainer.appendChild(cardEl);
+
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                cardEl.classList.remove('card-dealing');
+            }, 400 + index * 50);
         });
     }
 
@@ -2274,7 +2280,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Card animation system
     function createFloatingCard() {
-        const cards = ['0','0.5', '1', '2', '3', '5', '8', '13', '20', '40', '100', '?', '∞', '☕', 'L', 'G', 'F', 'D', 'S', 'M'];
+        const cards = ['0','0.5', '1', '2', '3', '5', '8', '13', '20', '40', '100', '?', '∞', '☕', 'L', 'G', 'F', 'D', 'S', 'M', '✨'];
         const types = ['', 'sparkle', 'energy'];
         
         const card = document.createElement('div');
