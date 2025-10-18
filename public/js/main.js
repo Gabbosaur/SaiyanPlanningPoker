@@ -2271,4 +2271,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize the music player
     musicPlayer.init();
+
+    // Card animation system
+    function createFloatingCard() {
+        const cards = ['0','0.5', '1', '2', '3', '5', '8', '13', '20', '40', '100', '?', '∞', '☕', 'L', 'G', 'F', 'D', 'S', 'M'];
+        const types = ['', 'sparkle', 'energy'];
+        
+        const card = document.createElement('div');
+        card.className = `floating-card ${types[Math.floor(Math.random() * types.length)]}`;
+        card.textContent = cards[Math.floor(Math.random() * cards.length)];
+        card.style.top = `${Math.random() * 80 + 10}%`;
+        
+        document.body.appendChild(card);
+        
+        setTimeout(() => card.remove(), 8000);
+    }
+
+    // Start card animations with random intervals
+    function scheduleNextCard() {
+        setTimeout(() => {
+            createFloatingCard();
+            scheduleNextCard();
+        }, 30000 + Math.random() * 270000);
+    }
+    scheduleNextCard();
 });

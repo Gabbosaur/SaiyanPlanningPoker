@@ -1,0 +1,44 @@
+.floating-card {
+    position: fixed;
+    width: 60px;
+    height: 90px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #1f2937;
+    z-index: 5;
+    pointer-events: none;
+    animation: floatAcross 8s linear forwards;
+}
+
+@keyframes floatAcross {
+    0% {
+        transform: translateX(-100px) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(calc(100vw + 100px)) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+.floating-card.sparkle {
+    background: linear-gradient(135deg, #ec4899, #be185d);
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
+}
+
+.floating-card.energy {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
