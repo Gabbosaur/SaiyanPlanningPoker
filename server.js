@@ -162,11 +162,11 @@ let heartbeatInterval = setInterval(() => {
         Object.keys(sessions).forEach(sessionId => {
             const session = sessions[sessionId];
             if (!session || !session.users) return;
-            
+
             Object.keys(session.users).forEach(userId => {
                 const user = session.users[userId];
                 if (!user) return;
-                
+
                 // Only mark as disconnected if no heartbeat for 30 minutes
                 if (user.isConnected && user.lastHeartbeat &&
                     Date.now() - user.lastHeartbeat > 1800000) { // 30 minutes in milliseconds
@@ -188,7 +188,7 @@ let sessionCleanupInterval = setInterval(() => {
         Object.keys(sessions).forEach(sessionId => {
             const session = sessions[sessionId];
             if (!session || !session.users) return;
-            
+
             // Check if session has any active users
             const hasActiveUsers = Object.values(session.users).some(user =>
                 user && user.isConnected && (now - user.lastHeartbeat) < 1800000
@@ -476,6 +476,17 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('super-saiyan', (data) => {
+        const { sessionId, userId } = data;
+        console.log(`Super Saiyan activated by user ${userId} in session ${sessionId}`);
+        console.log(`Session exists: ${!!sessions[sessionId]}`);
+        console.log(`Broadcasting to room: ${sessionId}`);
+        // Broadcast to all players in the session
+        io.to(sessionId).emit('super-saiyan-mode', { userId });
+        console.log(`Super Saiyan mode broadcasted`);
+    });
+
+
     // Add this to the Socket.io connection handling section
     // Handle collision animation
     socket.on('user-collision', (data) => {
@@ -496,7 +507,7 @@ io.on('connection', (socket) => {
 // Graceful shutdown handling
 process.on('SIGINT', () => {
     console.log('\nShutting down server gracefully...');
-    
+
     // Clear intervals
     if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
@@ -504,7 +515,7 @@ process.on('SIGINT', () => {
     if (sessionCleanupInterval) {
         clearInterval(sessionCleanupInterval);
     }
-    
+
     // Close server
     server.close(() => {
         console.log('Server closed');
@@ -514,7 +525,7 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
     console.log('\nShutting down server gracefully...');
-    
+
     // Clear intervals
     if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
@@ -522,7 +533,7 @@ process.on('SIGTERM', () => {
     if (sessionCleanupInterval) {
         clearInterval(sessionCleanupInterval);
     }
-    
+
     // Close server
     server.close(() => {
         console.log('Server closed');

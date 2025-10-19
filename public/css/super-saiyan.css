@@ -1,0 +1,19 @@
+@keyframes superSaiyanAura {
+    0% { 
+        box-shadow: 0 0 20px #fbbf24, 0 0 40px #f59e0b, 0 0 60px #d97706;
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 40px #fbbf24, 0 0 80px #f59e0b, 0 0 120px #d97706;
+        transform: scale(1.1);
+    }
+    100% { 
+        box-shadow: 0 0 20px #fbbf24, 0 0 40px #f59e0b, 0 0 60px #d97706;
+        transform: scale(1);
+    }
+}
+
+.super-saiyan-mode {
+    animation: superSaiyanAura 0.5s infinite;
+    border-color: #fbbf24 !important;
+}

@@ -557,6 +557,12 @@ document.addEventListener('DOMContentLoaded', () => {
             animateSmoothPunchBroadcast(attackerId, targetId, attackerName, targetName);
         });
 
+        socket.on('super-saiyan-mode', (data) => {
+            console.log('Received super-saiyan-mode from server:', data);
+            const { userId } = data;
+            triggerSuperSaiyan(userId);
+        });
+
         socket.on('connect_error', (error) => {
             console.error('Connection error:', error);
             updateConnectionStatus('disconnected');
@@ -684,6 +690,26 @@ document.addEventListener('DOMContentLoaded', () => {
                             targetId: id
                         });
                         animateSmoothPunch(socket.id, id);
+                    }
+                });
+            } else {
+                // Super Saiyan mode for own user
+                let clickCount = 0;
+                let clickTimer = null;
+                
+                participantEl.addEventListener('click', () => {
+                    clickCount++;
+                    
+                    if (clickTimer) clearTimeout(clickTimer);
+                    clickTimer = setTimeout(() => {
+                        clickCount = 0;
+                    }, 5000);
+                    
+                    if (clickCount >= 20) {
+                        console.log('Emitting super-saiyan event to server');
+                        socket.emit('super-saiyan', { sessionId, userId: socket.id });
+                        
+                        clickCount = 0;
                     }
                 });
             }
@@ -1897,9 +1923,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle music player panel
             this.playerToggle.addEventListener('click', (e) => {
                 e.stopPropagation(); // Prevent event from bubbling
+                this.playerToggle.classList.add('button-animate');
+                setTimeout(() => this.playerToggle.classList.remove('button-animate'), 200);
+                
                 this.playerPanel.classList.toggle('hidden');
                 if (!this.playerPanel.classList.contains('hidden')) {
-                    // Reposition the panel each time it's opened
+                    this.playerPanel.classList.add('panel-animate');
+                    setTimeout(() => this.playerPanel.classList.remove('panel-animate'), 300);
                     this.positionPanel();
                 }
             });
@@ -2291,6 +2321,41 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(card);
         
         setTimeout(() => card.remove(), 8000);
+    }
+
+    // Super Saiyan effect function
+    function triggerSuperSaiyan(userId) {
+        console.log(`Triggering Super Saiyan for user: ${userId}`);
+        const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
+        if (participantEl) {
+            console.log('Found participant element');
+            const avatar = participantEl.querySelector('.dbz-participant-card');
+            if (avatar) {
+                console.log('Found avatar element, adding super-saiyan-mode class');
+                avatar.classList.add('super-saiyan-mode');
+                console.log('Avatar classes:', avatar.className);
+                
+                if (soundEnabled) {
+                    celebrationSound.currentTime = 0;
+                    celebrationSound.volume = 1;
+                    celebrationSound.play().catch(e => console.warn('Sound error:', e));
+                    
+                    // Fade out sound starting at 2 seconds
+                    setTimeout(() => {
+                        fadeOutAudio(celebrationSound, 1000);
+                    }, 2000);
+                }
+                
+                setTimeout(() => {
+                    console.log('Removing super-saiyan-mode class');
+                    avatar.classList.remove('super-saiyan-mode');
+                }, 5000);
+            } else {
+                console.log('Avatar element not found');
+            }
+        } else {
+            console.log('Participant element not found for userId:', userId);
+        }
     }
 
     // Start card animations with random intervals
