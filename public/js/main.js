@@ -1888,49 +1888,69 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set up audio event listeners
             this.setupAudioEventListeners();
 
-            // Position the panel correctly
-            this.positionPanel();
+            // Initial positioning will be done when panel is first opened
         },
 
         positionPanel() {
             // Get the button's position
             const buttonRect = this.playerToggle.getBoundingClientRect();
+            const panelWidth = 320;
+            const panelHeight = 400; // Approximate panel height
+            const gap = 8;
 
-            // Get the panel's width
-            const panelWidth = 320; // Panel width in pixels
-
-            // Calculate the center position
+            // Calculate horizontal position (centered on button)
             const buttonCenterX = buttonRect.left + (buttonRect.width / 2);
-            const panelLeft = buttonCenterX - (panelWidth / 2);
+            let panelLeft = buttonCenterX - (panelWidth / 2);
 
-            // Set the panel position to be below the button and centered horizontally
-            this.playerPanel.style.top = `${buttonRect.bottom + window.scrollY + 8}px`; // 8px gap, adjusted for scroll
-            this.playerPanel.style.left = `${panelLeft + window.scrollX}px`;
-            this.playerPanel.style.right = 'auto'; // Reset right positioning
-
-            // Adjust if panel goes off-screen on the left
-            if (panelLeft < 0) {
-                this.playerPanel.style.left = `${window.scrollX}px`;
+            // Adjust if panel goes off-screen horizontally
+            if (panelLeft < gap) {
+                panelLeft = gap;
+            } else if (panelLeft + panelWidth > window.innerWidth - gap) {
+                panelLeft = window.innerWidth - panelWidth - gap;
             }
 
-            // Adjust if panel goes off-screen on the right
-            if (panelLeft + panelWidth > window.innerWidth) {
-                this.playerPanel.style.left = `${window.innerWidth + window.scrollX - panelWidth}px`;
+            // Calculate vertical position (prefer below, but above if no space)
+            let panelTop = buttonRect.bottom + gap;
+            let transformOrigin = 'top center';
+
+            // Check if there's enough space below
+            if (panelTop + panelHeight > window.innerHeight - gap) {
+                // Not enough space below, position above
+                panelTop = buttonRect.top - panelHeight - gap;
+                transformOrigin = 'bottom center';
+                
+                // If still not enough space above, position at top of screen
+                if (panelTop < gap) {
+                    panelTop = gap;
+                    transformOrigin = 'top center';
+                }
             }
+
+            // Apply positioning
+            this.playerPanel.style.position = 'fixed';
+            this.playerPanel.style.top = `${panelTop}px`;
+            this.playerPanel.style.left = `${panelLeft}px`;
+            this.playerPanel.style.right = 'auto';
+            this.playerPanel.style.transformOrigin = transformOrigin;
         },
 
         setupEventListeners() {
             // Toggle music player panel
             this.playerToggle.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent event from bubbling
+                e.stopPropagation();
                 this.playerToggle.classList.add('button-animate');
                 setTimeout(() => this.playerToggle.classList.remove('button-animate'), 200);
                 
-                this.playerPanel.classList.toggle('hidden');
-                if (!this.playerPanel.classList.contains('hidden')) {
+                const isHidden = this.playerPanel.classList.contains('hidden');
+                
+                if (isHidden) {
+                    // Position panel near button before showing
+                    this.positionPanel();
+                    this.playerPanel.classList.remove('hidden');
                     this.playerPanel.classList.add('panel-animate');
                     setTimeout(() => this.playerPanel.classList.remove('panel-animate'), 300);
-                    this.positionPanel();
+                } else {
+                    this.playerPanel.classList.add('hidden');
                 }
             });
 
@@ -1964,12 +1984,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.setVolume(e.target.value / 100);
             });
 
-            // Handle window resize
-            window.addEventListener('resize', () => {
-                if (!this.playerPanel.classList.contains('hidden')) {
-                    this.positionPanel();
-                }
-            });
+
 
             // Close the panel when clicking outside
             document.addEventListener('click', (e) => {
@@ -1977,6 +1992,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     !this.playerPanel.contains(e.target) &&
                     !this.playerToggle.contains(e.target)) {
                     this.playerPanel.classList.add('hidden');
+                }
+            });
+
+            // Reposition panel on window resize
+            window.addEventListener('resize', () => {
+                if (!this.playerPanel.classList.contains('hidden')) {
+                    this.positionPanel();
                 }
             });
 
