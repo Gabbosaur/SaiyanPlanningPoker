@@ -1585,7 +1585,7 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsBtn.addEventListener('click', () => {
         settingsModal.classList.remove('hidden');
         soundToggle.checked = soundEnabled;
-        themeSelector.value = currentTheme;
+        themeSelector.value = 'halloween'; // Set to match default theme
         deckSelector.value = currentDeckType;
 
         // Update avatar preview
@@ -2354,6 +2354,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Card animation system
     function createFloatingCard() {
+        const isHalloween = document.body.classList.contains('halloween-theme');
+        if (isHalloween) return;
+        
         const cards = ['0','0.5', '1', '2', '3', '5', '8', '13', '20', '40', '100', '?', '∞', '☕', 'L', 'G', 'F', 'D', 'S', 'M', '✨'];
         const types = ['', 'sparkle', 'energy'];
         
