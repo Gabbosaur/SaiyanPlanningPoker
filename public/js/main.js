@@ -1625,6 +1625,10 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'dbz':
                 document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden');
                 break;
+            case 'halloween':
+                document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden', 'halloween-theme');
+                scheduleHalloweenElements();
+                break;
             case 'dark':
                 document.body.classList.add('bg-gray-900', 'min-h-screen', 'text-white', 'overflow-hidden', 'dark-mode');
                 break;
@@ -2198,6 +2202,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
 
+        // Halloween special effects
+        triggerHalloweenEffect() {
+            if (!document.body.classList.contains('halloween-theme')) return;
+            
+            // Create spooky particles
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    const particle = document.createElement('div');
+                    particle.className = 'halloween-particle halloween-spark';
+                    particle.style.left = Math.random() * window.innerWidth + 'px';
+                    particle.style.top = Math.random() * window.innerHeight + 'px';
+                    document.body.appendChild(particle);
+                    
+                    setTimeout(() => particle.remove(), 3000);
+                }, i * 200);
+            }
+        },
+
         updatePlaylistActiveItem() {
             const items = this.playlistEl.querySelectorAll('.playlist-item');
             items.forEach((item, index) => {
@@ -2345,6 +2367,57 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => card.remove(), 8000);
     }
 
+    // Halloween animation system
+    function createHalloweenElement() {
+        const isHalloween = document.body.classList.contains('halloween-theme');
+        if (!isHalloween) return;
+
+        const elements = [
+            { emoji: '🦇', class: 'halloween-bat' },
+            { emoji: '🎃', class: 'halloween-pumpkin' },
+            { emoji: '👻', class: 'halloween-ghost' },
+            { emoji: '🕷️', class: 'halloween-spider' }
+        ];
+        
+        const element = elements[Math.floor(Math.random() * elements.length)];
+        const halloweenEl = document.createElement('div');
+        
+        // For spiders, randomly choose between two animations
+        if (element.class === 'halloween-spider') {
+            const spiderClass = Math.random() < 0.5 ? 'halloween-spider' : 'halloween-spider-up';
+            halloweenEl.className = `halloween-floating ${spiderClass}`;
+        } else {
+            halloweenEl.className = `halloween-floating ${element.class}`;
+        }
+        
+        halloweenEl.textContent = element.emoji;
+        if (element.class === 'halloween-spider') {
+            halloweenEl.style.top = '0px';
+            halloweenEl.style.left = `${Math.random() * 80 + 10}%`;
+        } else {
+            halloweenEl.style.top = `${Math.random() * 80 + 10}%`;
+            halloweenEl.style.left = '-50px';
+        }
+        
+        document.body.appendChild(halloweenEl);
+        
+        const animationDuration = element.class === 'halloween-bat' ? 12000 : 
+                                 element.class === 'halloween-pumpkin' ? 18000 : 
+                                 element.class === 'halloween-ghost' ? 14000 : 8000;
+        setTimeout(() => halloweenEl.remove(), animationDuration);
+    }
+
+    // Halloween theme toggle
+    function toggleHalloweenTheme(enable) {
+        if (enable) {
+            document.body.classList.add('halloween-theme');
+            // Start Halloween animations
+            scheduleHalloweenElements();
+        } else {
+            document.body.classList.remove('halloween-theme');
+        }
+    }
+
     // Super Saiyan effect function
     function triggerSuperSaiyan(userId) {
         console.log(`Triggering Super Saiyan for user: ${userId}`);
@@ -2355,6 +2428,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (avatar) {
                 console.log('Found avatar element, adding super-saiyan-mode class');
                 avatar.classList.add('super-saiyan-mode');
+                
+                // Add Halloween glow if Halloween theme is active
+                if (document.body.classList.contains('halloween-theme')) {
+                    avatar.classList.add('halloween-glow');
+                    musicPlayer.triggerHalloweenEffect();
+                }
+                
                 console.log('Avatar classes:', avatar.className);
                 
                 if (soundEnabled) {
@@ -2370,7 +2450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 setTimeout(() => {
                     console.log('Removing super-saiyan-mode class');
-                    avatar.classList.remove('super-saiyan-mode');
+                    avatar.classList.remove('super-saiyan-mode', 'halloween-glow');
                 }, 5000);
             } else {
                 console.log('Avatar element not found');
@@ -2388,4 +2468,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 30000 + Math.random() * 270000);
     }
     scheduleNextCard();
+
+    // Halloween element scheduler
+    function scheduleHalloweenElements() {
+        const isHalloween = document.body.classList.contains('halloween-theme');
+        if (!isHalloween) return;
+        
+        setTimeout(() => {
+            createHalloweenElement();
+            scheduleHalloweenElements();
+        }, 5000 + Math.random() * 10000);
+    }
+
+    // Theme selector handler
+    if (themeSelector) {
+        themeSelector.addEventListener('change', function() {
+            const theme = this.value;
+            
+            // Remove all theme classes
+            document.body.classList.remove('halloween-theme');
+            
+            // Apply selected theme
+            if (theme === 'halloween') {
+                toggleHalloweenTheme(true);
+            }
+            
+            // Save theme preference
+            localStorage.setItem('selectedTheme', theme);
+        });
+        
+        // Clear any existing theme and set default
+        localStorage.removeItem('selectedTheme');
+        const savedTheme = 'halloween';
+        themeSelector.value = savedTheme;
+        applyTheme(savedTheme);
+    }
 });

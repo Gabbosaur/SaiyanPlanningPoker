@@ -1,0 +1,397 @@
+/* Halloween Theme for DBZ Planning Poker */
+.halloween-theme {
+    --halloween-primary: #ff6b35;
+    --halloween-secondary: #8b4513;
+    --halloween-accent: #ff8c00;
+    --halloween-dark: #2d1b69;
+    --halloween-darker: #1a0f3d;
+    --halloween-ghost: rgba(255, 255, 255, 0.9);
+    --halloween-pumpkin: #ff6b35;
+    --halloween-bat: #4a0e4e;
+}
+
+.halloween-theme .dbz-bg {
+    background: linear-gradient(135deg, 
+        var(--halloween-dark) 0%, 
+        var(--halloween-darker) 50%, 
+        #0f0f23 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.halloween-theme .dbz-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(circle at 20% 80%, rgba(255, 107, 53, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(139, 69, 19, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(255, 140, 0, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.halloween-theme .dbz-card {
+    background: linear-gradient(145deg, 
+        rgba(45, 27, 105, 0.9) 0%, 
+        rgba(26, 15, 61, 0.9) 100%);
+    border: 2px solid var(--halloween-accent);
+    box-shadow: 
+        0 8px 32px rgba(255, 107, 53, 0.3),
+        inset 0 1px 0 rgba(255, 140, 0, 0.2);
+}
+
+.halloween-theme .dbz-header {
+    background: linear-gradient(90deg, 
+        rgba(45, 27, 105, 0.95) 0%, 
+        rgba(26, 15, 61, 0.95) 100%);
+    border-bottom: 2px solid var(--halloween-accent);
+}
+
+.halloween-theme .dbz-footer {
+    background: linear-gradient(0deg, 
+        rgba(45, 27, 105, 0.95) 0%, 
+        rgba(26, 15, 61, 0.95) 100%);
+    border-top: 2px solid var(--halloween-accent);
+}
+
+.halloween-theme .dbz-table {
+    background: radial-gradient(ellipse at center, 
+        rgba(45, 27, 105, 0.8) 0%, 
+        rgba(26, 15, 61, 0.9) 100%);
+    border: 3px solid var(--halloween-accent);
+    box-shadow: 
+        0 0 30px rgba(255, 107, 53, 0.4),
+        inset 0 0 20px rgba(255, 140, 0, 0.1);
+}
+
+.halloween-theme .card {
+    background: linear-gradient(145deg, 
+        var(--halloween-primary) 0%, 
+        var(--halloween-secondary) 100%);
+    border: 2px solid var(--halloween-accent);
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.halloween-theme .card:hover {
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 
+        0 15px 30px rgba(255, 107, 53, 0.4),
+        0 0 20px rgba(255, 140, 0, 0.6);
+}
+
+.halloween-theme .card.selected {
+    background: linear-gradient(145deg, 
+        var(--halloween-accent) 0%, 
+        var(--halloween-primary) 100%);
+    box-shadow: 
+        0 0 25px rgba(255, 140, 0, 0.8),
+        0 8px 16px rgba(255, 107, 53, 0.4);
+}
+
+/* Halloween floating elements */
+.halloween-floating {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.halloween-bat {
+    font-size: 28px;
+    color: var(--halloween-bat);
+    animation: batFly 12s linear;
+}
+
+.halloween-pumpkin {
+    font-size: 32px;
+    color: var(--halloween-pumpkin);
+    animation: pumpkinRoll 18s linear;
+}
+
+.halloween-ghost {
+    font-size: 36px;
+    color: var(--halloween-ghost);
+    animation: ghostFloat 14s ease-in-out;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+}
+
+.halloween-spider {
+    font-size: 20px;
+    color: #4a0e4e;
+    animation: spiderDangle 8s ease-in-out;
+}
+
+.halloween-spider-up {
+    font-size: 20px;
+    color: #4a0e4e;
+    animation: spiderDangleUp 8s ease-in-out;
+}
+
+@keyframes halloweenFloat {
+    0% {
+        transform: translateX(-100px) translateY(0px) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(calc(100vw + 100px)) translateY(-50px) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+@keyframes batFly {
+    0% {
+        transform: translateX(-100px) translateY(0px) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    25% {
+        transform: translateX(25vw) translateY(-30px) rotate(5deg);
+    }
+    50% {
+        transform: translateX(50vw) translateY(20px) rotate(-3deg);
+    }
+    75% {
+        transform: translateX(75vw) translateY(-15px) rotate(8deg);
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(calc(100vw + 100px)) translateY(10px) rotate(0deg);
+        opacity: 0;
+    }
+}
+
+@keyframes pumpkinRoll {
+    0% {
+        transform: translateX(-100px) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(calc(100vw + 100px)) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+@keyframes ghostFloat {
+    0% {
+        transform: translateX(-100px) translateY(0px) scale(1);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    25% {
+        transform: translateX(25vw) translateY(-20px) scale(1.1);
+    }
+    50% {
+        transform: translateX(50vw) translateY(15px) scale(0.9);
+    }
+    75% {
+        transform: translateX(75vw) translateY(-10px) scale(1.05);
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(calc(100vw + 100px)) translateY(5px) scale(1);
+        opacity: 0;
+    }
+}
+
+@keyframes spiderDangle {
+    0% {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    15% {
+        transform: translateY(40px);
+        opacity: 1;
+    }
+    30% {
+        transform: translateY(20px);
+        opacity: 1;
+    }
+    45% {
+        transform: translateY(50px);
+        opacity: 1;
+    }
+    60% {
+        transform: translateY(30px);
+        opacity: 1;
+    }
+    75% {
+        transform: translateY(60px);
+        opacity: 1;
+    }
+    90% {
+        transform: translateY(40px);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(200px);
+        opacity: 0;
+    }
+}
+
+@keyframes spiderDangleUp {
+    0% {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    15% {
+        transform: translateY(40px);
+        opacity: 1;
+    }
+    30% {
+        transform: translateY(20px);
+        opacity: 1;
+    }
+    45% {
+        transform: translateY(50px);
+        opacity: 1;
+    }
+    60% {
+        transform: translateY(30px);
+        opacity: 1;
+    }
+    75% {
+        transform: translateY(60px);
+        opacity: 1;
+    }
+    90% {
+        transform: translateY(20px);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+}
+
+/* Halloween particle effects */
+.halloween-particle {
+    position: absolute;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.halloween-spark {
+    width: 4px;
+    height: 4px;
+    background: var(--halloween-accent);
+    border-radius: 50%;
+    animation: halloweenSpark 3s infinite ease-out;
+}
+
+@keyframes halloweenSpark {
+    0% {
+        transform: scale(0) rotate(0deg);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1) rotate(180deg);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(0) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Halloween celebration overlay */
+.halloween-theme #celebration-overlay {
+    background: radial-gradient(circle at center, 
+        rgba(255, 107, 53, 0.3) 0%, 
+        rgba(45, 27, 105, 0.8) 100%);
+}
+
+.halloween-theme #celebration-text {
+    color: var(--halloween-accent);
+    text-shadow: 
+        0 0 20px rgba(255, 140, 0, 0.8),
+        0 0 40px rgba(255, 107, 53, 0.6);
+    animation: halloweenPulse 2s infinite ease-in-out;
+}
+
+@keyframes halloweenPulse {
+    0%, 100% {
+        transform: scale(1);
+        text-shadow: 
+            0 0 20px rgba(255, 140, 0, 0.8),
+            0 0 40px rgba(255, 107, 53, 0.6);
+    }
+    50% {
+        transform: scale(1.05);
+        text-shadow: 
+            0 0 30px rgba(255, 140, 0, 1),
+            0 0 60px rgba(255, 107, 53, 0.8);
+    }
+}
+
+/* Halloween buttons */
+.halloween-theme button {
+    transition: all 0.3s ease;
+}
+
+.halloween-theme button:hover {
+    box-shadow: 0 0 15px rgba(255, 140, 0, 0.5);
+}
+
+.halloween-theme .bg-yellow-600 {
+    background: linear-gradient(145deg, 
+        var(--halloween-accent) 0%, 
+        var(--halloween-primary) 100%);
+}
+
+.halloween-theme .bg-yellow-600:hover {
+    background: linear-gradient(145deg, 
+        var(--halloween-primary) 0%, 
+        var(--halloween-accent) 100%);
+}
+
+/* Halloween emoji panel */
+.halloween-theme #emoji-panel {
+    background: rgba(45, 27, 105, 0.9);
+    border: 1px solid var(--halloween-accent);
+}
+
+.halloween-theme .emoji-btn:hover {
+    background: rgba(255, 140, 0, 0.2);
+    transform: scale(1.3);
+}
+
+/* Halloween spooky glow effect */
+.halloween-glow {
+    animation: halloweenSpookyGlow 3s infinite ease-in-out;
+}
+
+@keyframes halloweenSpookyGlow {
+    0%, 100% {
+        box-shadow: 
+            0 0 10px rgba(255, 107, 53, 0.5),
+            0 0 20px rgba(255, 140, 0, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 20px rgba(255, 107, 53, 0.8),
+            0 0 40px rgba(255, 140, 0, 0.6);
+    }
+}
