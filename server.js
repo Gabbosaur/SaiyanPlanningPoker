@@ -805,7 +805,6 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0';
-server.listen(PORT, HOST, () => {
-    console.log(`Server running securely on ${HOST}:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
 });
