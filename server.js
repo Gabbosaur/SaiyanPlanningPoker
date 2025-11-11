@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,61 +19,229 @@ const io = socketIo(server, {
     connectTimeout: 45000,     // 45 seconds
 });
 
-// Increase payload size limit
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss:; media-src 'self';");
+    next();
+});
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+// Input validation and sanitization
+function sanitizeInput(input) {
+    if (typeof input !== 'string') return '';
+    return input.replace(/[<>"'&]/g, function(match) {
+        const map = {
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#x27;',
+            '&': '&amp;'
+        };
+        return map[match];
+    }).trim();
+}
 
-// Configure multer for avatar uploads
+// Rate limiting for file uploads
+const uploadAttempts = new Map();
+function checkUploadRate(ip) {
+    const now = Date.now();
+    const attempts = uploadAttempts.get(ip) || [];
+    const recentAttempts = attempts.filter(time => now - time < 60000); // 1 minute window
+    
+    if (recentAttempts.length >= 5) { // Max 5 uploads per minute
+        return false;
+    }
+    
+    recentAttempts.push(now);
+    uploadAttempts.set(ip, recentAttempts);
+    return true;
+}
+
+// Increase payload size limit with validation
+app.use(express.json({ 
+    limit: '1mb', // Reduced from 10mb for security
+    verify: (req, res, buf) => {
+        if (buf.length > 1024 * 1024) { // 1MB limit
+            throw new Error('Request too large');
+        }
+    }
+}));
+app.use(express.urlencoded({ 
+    limit: '1mb', 
+    extended: true,
+    verify: (req, res, buf) => {
+        if (buf.length > 1024 * 1024) {
+            throw new Error('Request too large');
+        }
+    }
+}));
+
+// Serve static files with security
+app.use(express.static(path.join(__dirname, 'public'), {
+    dotfiles: 'deny',
+    index: ['index.html'],
+    setHeaders: (res, filePath) => {
+        // Prevent execution of uploaded files
+        if (filePath.includes('/uploads/')) {
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+        }
+    }
+}));
+
+// Secure uploads directory
+app.use('/uploads', (req, res, next) => {
+    // Validate file path to prevent directory traversal
+    const requestedPath = path.normalize(req.path);
+    if (requestedPath.includes('..') || requestedPath.includes('~')) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    next();
+}, express.static(path.join(__dirname, 'public/uploads'), {
+    dotfiles: 'deny',
+    setHeaders: (res) => {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+}));
+
+// Configure multer for avatar uploads with security
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, 'public/uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
+        const uploadDir = path.resolve(__dirname, 'public/uploads'); // Use resolve to prevent traversal
+        try {
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
+            }
+            cb(null, uploadDir);
+        } catch (error) {
+            cb(error);
         }
-        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, `avatar-${uniqueSuffix}.${file.originalname.split('.').pop()}`);
+        // Generate secure filename
+        const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(6).toString('hex');
+        const ext = path.extname(file.originalname).toLowerCase();
+        
+        // Validate file extension
+        const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        if (!allowedExts.includes(ext)) {
+            return cb(new Error('Invalid file type'));
+        }
+        
+        cb(null, `avatar-${uniqueSuffix}${ext}`);
     }
 });
 
-const upload = multer({ storage });
-
-// Handle avatar upload
-app.post('/upload-avatar', upload.single('avatar'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+// File filter for security
+const fileFilter = (req, file, cb) => {
+    // Check MIME type
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+        return cb(new Error('Invalid file type'), false);
     }
-    res.json({ path: `/uploads/${req.file.filename}` });
+    
+    // Check file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+        return cb(new Error('File too large'), false);
+    }
+    
+    cb(null, true);
+};
+
+const upload = multer({ 
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+        files: 1
+    }
+});
+
+// Handle avatar upload with security
+app.post('/upload-avatar', (req, res) => {
+    // Check rate limiting
+    if (!checkUploadRate(req.ip)) {
+        return res.status(429).json({ error: 'Too many upload attempts' });
+    }
+    
+    // Basic CSRF protection
+    const csrfToken = req.headers['x-csrf-token'];
+    if (!csrfToken || csrfToken.length < 32) {
+        return res.status(403).json({ error: 'Invalid CSRF token' });
+    }
+    
+    upload.single('avatar')(req, res, (err) => {
+        if (err) {
+            console.error('Upload error:', err.message);
+            return res.status(400).json({ error: sanitizeInput(err.message) });
+        }
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        // Validate uploaded file exists and is in correct location
+        const filePath = path.resolve(__dirname, 'public/uploads', req.file.filename);
+        if (!filePath.startsWith(path.resolve(__dirname, 'public/uploads'))) {
+            fs.unlinkSync(filePath); // Delete potentially malicious file
+            return res.status(400).json({ error: 'Invalid file path' });
+        }
+        
+        res.json({ path: sanitizeInput(`/uploads/${req.file.filename}`) });
+    });
 });
 
 // Add this route near the other audio file handling
-// Handle punch sound file specifically to prevent range request issues
-app.get('/sounds/punch.mp3', (req, res) => {
-    const audioPath = path.join(__dirname, 'public', 'sounds', 'punch.mp3');
+// Handle audio files securely
+app.get('/sounds/:filename', (req, res) => {
+    const filename = req.params.filename;
+    
+    // Validate filename to prevent path traversal
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        return res.status(400).json({ error: 'Invalid filename' });
+    }
+    
+    // Only allow specific audio files
+    const allowedFiles = ['punch.mp3', 'super-saiyan.mp3'];
+    if (!allowedFiles.includes(filename)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+    
+    const audioPath = path.resolve(__dirname, 'public', 'sounds', filename);
+    
+    // Ensure path is within sounds directory
+    if (!audioPath.startsWith(path.resolve(__dirname, 'public', 'sounds'))) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
 
     // Check if file exists
     if (!fs.existsSync(audioPath)) {
-        return res.status(404).send('Punch sound file not found');
+        return res.status(404).json({ error: 'File not found' });
     }
 
-    // Get file stats
-    const stat = fs.statSync(audioPath);
-    const fileSize = stat.size;
+    try {
+        const stat = fs.statSync(audioPath);
+        const fileSize = stat.size;
 
-    // Set proper headers
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Length', fileSize);
-    res.setHeader('Accept-Ranges', 'none'); // Disable range requests
+        // Set proper headers
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', fileSize);
+        res.setHeader('Accept-Ranges', 'none');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
 
-    // Stream the file
-    const readStream = fs.createReadStream(audioPath);
-    readStream.pipe(res);
+        // Stream the file
+        const readStream = fs.createReadStream(audioPath);
+        readStream.on('error', () => {
+            res.status(500).json({ error: 'File read error' });
+        });
+        readStream.pipe(res);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
 });
 
 // Game sessions storage
@@ -221,7 +390,13 @@ io.on('connection', (socket) => {
     // Create or join a session
     socket.on('join-session', (data) => {
         try {
-            const { sessionId, user } = data;
+            const { sessionId, user, csrfToken } = data;
+            
+            // Validate CSRF token
+            if (!csrfToken || typeof csrfToken !== 'string' || csrfToken.length < 32) {
+                socket.emit('error', { message: 'Invalid request' });
+                return;
+            }
 
             // Validate input
             if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 50) {
@@ -234,11 +409,20 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            // Sanitize user name
-            user.name = user.name.replace(/[<>\"']/g, '').trim();
-            if (!user.name) {
-                socket.emit('error', { message: 'User name cannot be empty' });
+            // Sanitize and validate user input
+            user.name = sanitizeInput(user.name);
+            if (!user.name || user.name.length < 1 || user.name.length > 50) {
+                socket.emit('error', { message: 'Invalid user name' });
                 return;
+            }
+            
+            // Sanitize avatar path if present
+            if (user.avatar) {
+                user.avatar = sanitizeInput(user.avatar);
+                // Validate avatar path format
+                if (!user.avatar.startsWith('/uploads/') || user.avatar.includes('..')) {
+                    user.avatar = null; // Remove invalid avatar
+                }
             }
 
             // Initialize session if it doesn't exist
@@ -322,7 +506,13 @@ io.on('connection', (socket) => {
     // Handle vote submission
     socket.on('submit-vote', (data) => {
         try {
-            const { sessionId, vote } = data;
+            const { sessionId, vote, csrfToken } = data;
+            
+            // Validate CSRF token
+            if (!csrfToken || typeof csrfToken !== 'string' || csrfToken.length < 32) {
+                socket.emit('error', { message: 'Invalid request' });
+                return;
+            }
             const session = sessions[sessionId];
 
             // Validate session exists
@@ -396,10 +586,19 @@ io.on('connection', (socket) => {
     });
 
     // Handle reset votes
-    socket.on('reset-votes', (sessionId) => {
-        console.log('Reset votes requested for session:', sessionId);
+    socket.on('reset-votes', (data) => {
+        try {
+            const { sessionId, csrfToken } = data;
+            
+            // Validate CSRF token
+            if (!csrfToken || typeof csrfToken !== 'string' || csrfToken.length < 32) {
+                socket.emit('error', { message: 'Invalid request' });
+                return;
+            }
+            
+            console.log('Reset votes requested for session:', sessionId);
 
-        const session = sessions[sessionId];
+            const session = sessions[sessionId];
         if (session) {
             // Reset session data
             session.votes = {};
@@ -420,6 +619,10 @@ io.on('connection', (socket) => {
         } else {
             console.error('Session not found for reset:', sessionId);
         }
+        } catch (error) {
+            console.error('Error in reset-votes:', error);
+            socket.emit('error', { message: 'Failed to reset votes' });
+        }
     });
 
     // Handle card deck change - FIXED
@@ -438,41 +641,79 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle emoji reaction
+    // Handle emoji reaction with validation
     socket.on('send-emoji', (data) => {
-        const { sessionId, emoji, targetUserId } = data;
-
-        if (sessions[sessionId]) {
-            if (targetUserId) {
-                // Send to specific user
-                io.to(sessionId).emit('emoji-received', {
-                    emoji,
-                    from: sessions[sessionId].users[socket.id],
-                    to: targetUserId
-                });
-            } else {
-                // Broadcast to all
-                io.to(sessionId).emit('emoji-received', {
-                    emoji,
-                    from: sessions[sessionId].users[socket.id],
-                    to: null
-                });
+        try {
+            const { sessionId, emoji, targetUserId } = data;
+            
+            // Validate inputs
+            if (!sessionId || !emoji || typeof emoji !== 'string') {
+                return; // Silently ignore invalid emoji data
             }
+            
+            // Validate emoji (only allow specific emojis)
+            const allowedEmojis = ['👍', '👎', '❓', '🎉', '😂', '🔥', '⚡', '💪'];
+            if (!allowedEmojis.includes(emoji)) {
+                return; // Silently ignore invalid emojis
+            }
+
+            if (sessions[sessionId] && sessions[sessionId].users[socket.id]) {
+                const fromUser = {
+                    id: sessions[sessionId].users[socket.id].id,
+                    name: sanitizeInput(sessions[sessionId].users[socket.id].name)
+                };
+                
+                if (targetUserId && sessions[sessionId].users[targetUserId]) {
+                    // Send to specific user
+                    io.to(sessionId).emit('emoji-received', {
+                        emoji,
+                        from: fromUser,
+                        to: sanitizeInput(targetUserId)
+                    });
+                } else {
+                    // Broadcast to all
+                    io.to(sessionId).emit('emoji-received', {
+                        emoji,
+                        from: fromUser,
+                        to: null
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error sending emoji:', error);
         }
     });
 
-    // Handle avatar update
+    // Handle avatar update with validation
     socket.on('update-avatar', (data) => {
-        const { sessionId, avatarPath } = data;
+        try {
+            const { sessionId, avatarPath } = data;
+            
+            // Validate inputs
+            if (!sessionId || !avatarPath || typeof avatarPath !== 'string') {
+                socket.emit('error', { message: 'Invalid avatar data' });
+                return;
+            }
+            
+            // Sanitize and validate avatar path
+            const sanitizedPath = sanitizeInput(avatarPath);
+            if (!sanitizedPath.startsWith('/uploads/') || sanitizedPath.includes('..')) {
+                socket.emit('error', { message: 'Invalid avatar path' });
+                return;
+            }
 
-        if (sessions[sessionId] && sessions[sessionId].users[socket.id]) {
-            sessions[sessionId].users[socket.id].avatar = avatarPath;
+            if (sessions[sessionId] && sessions[sessionId].users[socket.id]) {
+                sessions[sessionId].users[socket.id].avatar = sanitizedPath;
 
-            // Notify all users
-            io.to(sessionId).emit('avatar-updated', {
-                userId: socket.id,
-                avatarPath
-            });
+                // Notify all users
+                io.to(sessionId).emit('avatar-updated', {
+                    userId: socket.id,
+                    avatarPath: sanitizedPath
+                });
+            }
+        } catch (error) {
+            console.error('Error updating avatar:', error);
+            socket.emit('error', { message: 'Failed to update avatar' });
         }
     });
 
@@ -493,15 +734,26 @@ io.on('connection', (socket) => {
         const { sessionId, attackerId, targetId } = data;
 
         if (sessions[sessionId]) {
-            // Broadcast to all users in the session
+            // Broadcast to all users in the session with sanitized names
             io.to(sessionId).emit('collision-animation', {
-                attackerId,
-                targetId,
-                attackerName: sessions[sessionId].users[attackerId]?.name || 'Unknown',
-                targetName: sessions[sessionId].users[targetId]?.name || 'Unknown'
+                attackerId: sanitizeInput(attackerId),
+                targetId: sanitizeInput(targetId),
+                attackerName: sanitizeInput(sessions[sessionId].users[attackerId]?.name || 'Unknown'),
+                targetName: sanitizeInput(sessions[sessionId].users[targetId]?.name || 'Unknown')
             });
         }
     });
+});
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+    console.error('Server error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ error: 'Not found' });
 });
 
 // Graceful shutdown handling
@@ -541,7 +793,19 @@ process.on('SIGTERM', () => {
     });
 });
 
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+});
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+const HOST = process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0';
+server.listen(PORT, HOST, () => {
+    console.log(`Server running securely on ${HOST}:${PORT}`);
 });

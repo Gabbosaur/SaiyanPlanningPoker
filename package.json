@@ -1,8 +1,9 @@
 {
-  "name": "dbz-planning-poker",
+  "name": "@gabbosaur/dbz-planning-poker",
   "version": "1.0.0",
   "description": "Dragon Ball Z themed Planning Poker application",
   "main": "server.js",
+  "private": true,
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
@@ -21,6 +22,6 @@
     "websocket",
     "real-time"
   ],
-  "author": "Your Name",
+  "author": "Gabbosaur",
   "license": "MIT"
 }

@@ -1,4 +1,53 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Input sanitization utility
+    function sanitizeInput(input) {
+        if (typeof input !== 'string') return '';
+        return input.replace(/[<>"'&]/g, function(match) {
+            const map = {
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#x27;',
+                '&': '&amp;'
+            };
+            return map[match];
+        });
+    }
+
+    // CSRF token generation and validation
+    let csrfToken = null;
+    function generateCSRFToken() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    function getCSRFToken() {
+        if (!csrfToken) {
+            csrfToken = generateCSRFToken();
+            sessionStorage.setItem('csrfToken', csrfToken);
+        }
+        return csrfToken;
+    }
+
+    // Initialize CSRF token
+    csrfToken = sessionStorage.getItem('csrfToken') || generateCSRFToken();
+    sessionStorage.setItem('csrfToken', csrfToken);
+
+    // Safe DOM content setter
+    function setSafeContent(element, content) {
+        if (!element) return;
+        element.textContent = content; // Always use textContent to prevent XSS
+    }
+
+    // Safe HTML creation with sanitization
+    function createSafeElement(tag, textContent = '', className = '') {
+        const element = document.createElement(tag);
+        if (textContent) element.textContent = sanitizeInput(textContent);
+        if (className) element.className = className;
+        return element;
+    }
+
     // DOM Elements
     const loginScreen = document.getElementById('login-screen');
     const gameScreen = document.getElementById('game-screen');
@@ -94,7 +143,9 @@ document.addEventListener('DOMContentLoaded', () => {
             resetBtn.classList.remove('animate-pulse');
         }, 1000);
 
-        socket.emit('reset-votes', sessionId);
+        if (socket && socket.connected) {
+            socket.emit('reset-votes', { sessionId, csrfToken: getCSRFToken() });
+        }
     });
 
     // Handle heart button click
@@ -218,7 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Join session
         socket.emit('join-session', {
             sessionId,
-            user
+            user,
+            csrfToken: getCSRFToken()
         });
     });
 
@@ -244,7 +296,12 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarFile = file;
             const reader = new FileReader();
             reader.onload = (event) => {
-                avatarPreview.innerHTML = `<img src="${event.target.result}" alt="Avatar" class="w-full h-full object-cover">`;
+                const img = document.createElement('img');
+                img.src = event.target.result;
+                img.alt = 'Avatar';
+                img.className = 'w-full h-full object-cover';
+                avatarPreview.innerHTML = '';
+                avatarPreview.appendChild(img);
             };
             reader.readAsDataURL(file);
         }
@@ -279,8 +336,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const data = await response.json();
                 if (data.path) {
-                    user.avatar = data.path;
-                    settingsAvatarPreview.innerHTML = `<img src="${data.path}" alt="Avatar" class="w-full h-full object-cover">`;
+                    user.avatar = sanitizeInput(data.path);
+                    const img = document.createElement('img');
+                    img.src = user.avatar;
+                    img.alt = 'Avatar';
+                    img.className = 'w-full h-full object-cover';
+                    settingsAvatarPreview.innerHTML = '';
+                    settingsAvatarPreview.appendChild(img);
                     // Update avatar in the current session if already joined
                     if (socket && sessionId && socket.connected) {
                         socket.emit('update-avatar', {
@@ -306,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update UI
             loginScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
-            sessionIdDisplay.textContent = sessionId;
+            setSafeContent(sessionIdDisplay, sanitizeInput(sessionId));
 
             // Store the current session globally
             currentSession = session;
@@ -601,7 +663,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Rejoining session:', sessionId);
                 socket.emit('join-session', {
                     sessionId,
-                    user
+                    user,
+                    csrfToken: getCSRFToken()
                 });
             }
         });
@@ -714,15 +777,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            const avatarContent = participant.avatar
-                ? `<img src="${participant.avatar}" alt="${participant.name}" class="w-full h-full object-cover">`
-                : `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-xl text-gray-500"></i></div>`;
+            let avatarContent;
+            if (participant.avatar) {
+                const img = document.createElement('img');
+                img.src = sanitizeInput(participant.avatar);
+                img.alt = sanitizeInput(participant.name);
+                img.className = 'w-full h-full object-cover';
+                avatarContent = img.outerHTML;
+            } else {
+                avatarContent = `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-xl text-gray-500"></i></div>`;
+            }
 
             participantEl.innerHTML = `
             <div class="dbz-participant-card w-16 h-16 rounded-full overflow-hidden shadow-lg border-2 ${id === socket.id ? 'border-yellow-500' : 'border-gray-700'} pointer-events-auto">
                 ${avatarContent}
             </div>
-            <div class="text-center mt-1 text-xs font-medium participant-name pointer-events-none">${participant.name}</div>
+            <div class="text-center mt-1 text-xs font-medium participant-name pointer-events-none">${sanitizeInput(participant.name)}</div>
             <div class="vote-indicator hidden text-center mt-1 pointer-events-none">
                 <div class="dbz-vote-card inline-block px-3 py-1 rounded-lg font-bold">?</div>
             </div>
@@ -943,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create collision text with names
         const collisionText = document.createElement('div');
         collisionText.className = 'punch-text';
-        collisionText.textContent = `${attackerName} hits ${targetName}!`;
+        setSafeContent(collisionText, `${sanitizeInput(attackerName)} hits ${sanitizeInput(targetName)}!`);
         collisionText.style.left = '50%';
         collisionText.style.top = '30%';
         collisionText.style.transform = 'translateX(-50%)';
@@ -1156,7 +1226,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Join the session again
         socket.emit('join-session', {
             sessionId,
-            user
+            user,
+            csrfToken: getCSRFToken()
         });
 
         // Start heartbeat again
@@ -1262,7 +1333,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        socket.emit('submit-vote', { sessionId, vote: value });
+        if (socket && socket.connected) {
+            socket.emit('submit-vote', { sessionId, vote: value, csrfToken: getCSRFToken() });
+        }
 
         // Only show the current user's vote, not others
         const userVoteIndicator = document.querySelector(`[data-user-id="${socket.id}"] .vote-indicator`);
@@ -1378,10 +1451,12 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarContainer.className = 'w-10 h-10 rounded-full overflow-hidden bg-gray-700 border border-gray-600 flex-shrink-0';
 
             if (participant?.avatar) {
-                // Sanitize avatar path and name to prevent XSS
-                const sanitizedAvatar = participant.avatar.replace(/[<>\"']/g, '');
-                const sanitizedName = participant.name.replace(/[<>\"']/g, '');
-                avatarContainer.innerHTML = `<img src="${sanitizedAvatar}" alt="${sanitizedName}" class="w-full h-full object-cover">`;
+                const img = document.createElement('img');
+                img.src = sanitizeInput(participant.avatar);
+                img.alt = sanitizeInput(participant.name);
+                img.className = 'w-full h-full object-cover';
+                avatarContainer.innerHTML = '';
+                avatarContainer.appendChild(img);
             } else {
                 avatarContainer.innerHTML = '<i class="fas fa-user text-gray-500 w-full h-full flex items-center justify-center"></i>';
             }
@@ -1389,8 +1464,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Name section (compact)
             const nameText = document.createElement('div');
             nameText.className = 'text-xs font-medium text-gray-300 text-center truncate max-w-[4rem]';
-            nameText.textContent = participant?.name || 'Unknown';
-            nameText.title = participant?.name || 'Unknown';
+            const safeName = sanitizeInput(participant?.name || 'Unknown');
+            setSafeContent(nameText, safeName);
+            nameText.title = safeName;
 
             // Vote value section
             const voteValue = document.createElement('div');
@@ -1445,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', () => {
         notification.className = `fixed top-1 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500' :
             type === 'error' ? 'bg-red-500' : 'bg-blue-500'
             } text-white`;
-        notification.textContent = message;
+        setSafeContent(notification, sanitizeInput(message));
         document.body.appendChild(notification);
 
         // Remove notification after 1.5 seconds
@@ -1590,9 +1666,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update avatar preview
         if (user.avatar) {
-            // Sanitize avatar path to prevent XSS
-            const sanitizedAvatar = user.avatar.replace(/[<>\"']/g, '');
-            settingsAvatarPreview.innerHTML = `<img src="${sanitizedAvatar}" alt="Avatar" class="w-full h-full object-cover">`;
+            const img = document.createElement('img');
+            img.src = sanitizeInput(user.avatar);
+            img.alt = 'Avatar';
+            img.className = 'w-full h-full object-cover';
+            settingsAvatarPreview.innerHTML = '';
+            settingsAvatarPreview.appendChild(img);
         }
     });
 
@@ -2053,10 +2132,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 playlistItem.className = 'playlist-item';
                 playlistItem.dataset.index = index;
 
-                playlistItem.innerHTML = `
-                <div class="playlist-item-title">${song.title}</div>
-                <div class="playlist-item-duration">${song.duration}</div>
-            `;
+                const titleDiv = createSafeElement('div', song.title, 'playlist-item-title');
+                const durationDiv = createSafeElement('div', song.duration, 'playlist-item-duration');
+                playlistItem.appendChild(titleDiv);
+                playlistItem.appendChild(durationDiv);
 
                 // Add click event listener with stopPropagation
                 playlistItem.addEventListener('click', (e) => {
@@ -2072,7 +2151,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Create a temporary error message
             const errorEl = document.createElement('div');
             errorEl.className = 'music-player-error absolute top-2 left-0 right-0 bg-red-600 text-white text-center py-1 px-2 rounded text-sm z-50';
-            errorEl.textContent = message;
+            setSafeContent(errorEl, sanitizeInput(message));
             this.playerPanel.appendChild(errorEl);
 
             // Remove after 3 seconds
@@ -2093,7 +2172,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Selected song:`, song);
 
             // Update UI with loading indicator
-            this.currentSongNameEl.innerHTML = `${song.title} <span class="loading-indicator"></span>`;
+            const titleSpan = createSafeElement('span', song.title);
+            const loadingSpan = createSafeElement('span', '', 'loading-indicator');
+            this.currentSongNameEl.innerHTML = '';
+            this.currentSongNameEl.appendChild(titleSpan);
+            this.currentSongNameEl.appendChild(document.createTextNode(' '));
+            this.currentSongNameEl.appendChild(loadingSpan);
             this.updatePlaylistActiveItem();
 
             // Reset progress bar
@@ -2107,7 +2191,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Remove loading indicator when playback starts or fails
             const removeLoadingIndicator = () => {
-                this.currentSongNameEl.innerHTML = song.title;
+                setSafeContent(this.currentSongNameEl, song.title);
             };
 
             // Set up one-time event listeners for loading indicator
