@@ -314,8 +314,8 @@ function calculateResults(votes) {
         ? (numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length).toFixed(1)
         : '-';
 
-    // Check for consensus (70% agreement)
-    const consensus = frequency[mode] / votes.length >= 0.7;
+    // Check for consensus (100% agreement)
+    const consensus = frequency[mode] === votes.length;
 
     return {
         mode,
