@@ -270,6 +270,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('avatar', avatarFile);
                 const response = await fetch('/upload-avatar', {
                     method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': getCSRFToken()
+                    },
                     body: formData
                 });
                 const data = await response.json();
@@ -356,6 +359,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('avatar', file);
                 const response = await fetch('/upload-avatar', {
                     method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': getCSRFToken()
+                    },
                     body: formData
                 });
                 
@@ -2620,8 +2626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "🥖 Fugassa!"
     ];
 
-    function showGiftMessage(x, y) {
-        const message = giftMessages[Math.floor(Math.random() * giftMessages.length)];
+    function showChristmasMessage(x, y, message) {
         const messageEl = document.createElement('div');
         messageEl.className = 'fixed pointer-events-none z-50 bg-red-600 text-white px-3 py-2 rounded-lg shadow-lg text-sm font-medium';
         messageEl.style.left = `${x}px`;
@@ -2663,14 +2668,29 @@ document.addEventListener('DOMContentLoaded', () => {
         christmasEl.className = `christmas-floating ${element.class}`;
         christmasEl.textContent = element.emoji;
         
-        // Add click event for gift emoji
-        if (element.class === 'christmas-gift') {
+        // Add click events for Christmas elements (except snowflakes)
+        if (element.class !== 'christmas-snowflake') {
             christmasEl.style.cursor = 'pointer';
             christmasEl.style.pointerEvents = 'auto';
             christmasEl.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const rect = christmasEl.getBoundingClientRect();
-                showGiftMessage(rect.left + rect.width / 2, rect.top);
+                let message;
+                switch (element.class) {
+                    case 'christmas-santa':
+                        message = '🎅 Ho ho ho!';
+                        break;
+                    case 'christmas-tree':
+                        message = '🎄 Merry Christmas!';
+                        break;
+                    case 'christmas-star':
+                        message = '⭐ Wish upon a star!';
+                        break;
+                    case 'christmas-gift':
+                        message = giftMessages[Math.floor(Math.random() * giftMessages.length)];
+                        break;
+                }
+                showChristmasMessage(rect.left + rect.width / 2, rect.top, message);
             });
         }
         
