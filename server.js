@@ -25,7 +25,7 @@ app.use((req, res, next) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss:; media-src 'self';");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' ws: wss: https://cdn.socket.io; media-src 'self';");
     next();
 });
 
@@ -375,8 +375,14 @@ let sessionCleanupInterval = setInterval(() => {
 }, 3600000); // Check every hour
 
 // Socket.io connection handling
+console.log('Setting up socket handlers...');
 io.on('connection', (socket) => {
-    console.log('New user connected:', socket.id);
+    console.log('=== NEW USER CONNECTED ===', socket.id);
+
+    // Test event
+    socket.on('test', () => {
+        console.log('TEST EVENT RECEIVED');
+    });
 
     // Heartbeat response
     socket.on('heartbeat', () => {
@@ -389,6 +395,8 @@ io.on('connection', (socket) => {
 
     // Create or join a session
     socket.on('join-session', (data) => {
+        console.log('JOIN SESSION RECEIVED');
+        console.log('User isSpectator:', data.user?.isSpectator);
         try {
             const { sessionId, user, csrfToken } = data;
             
@@ -447,12 +455,14 @@ io.on('connection', (socket) => {
                 ...user,
                 id: socket.id,
                 isConnected: true,
+                isSpectator: user.isSpectator || false,
                 lastHeartbeat: Date.now()
             };
 
             // Join socket room
             socket.join(sessionId);
-            console.log(`User ${user.name} (${socket.id}) joined session ${sessionId}`);
+            console.log(`User ${user.name} (${socket.id}) joined session ${sessionId} as ${user.isSpectator ? 'SPECTATOR' : 'PLAYER'}`);
+            console.log('User object:', sessions[sessionId].users[socket.id]);
 
             // Send session data to client
             socket.emit('session-joined', {
@@ -526,6 +536,12 @@ io.on('connection', (socket) => {
                 socket.emit('error', { message: 'User not in session' });
                 return;
             }
+            
+            // Prevent spectators from voting
+            if (session.users[socket.id].isSpectator) {
+                socket.emit('error', { message: 'Spectators cannot vote' });
+                return;
+            }
 
             // Validate vote value
             const currentDeck = cardDecks[session.currentDeck];
@@ -550,19 +566,29 @@ io.on('connection', (socket) => {
                 voterName: session.users[socket.id]?.name || 'Unknown'
             });
 
-            // Update vote count
-            const connectedUsers = Object.values(session.users).filter(user => user.isConnected);
-            const votesCount = Object.keys(session.votes).length;
+            // Update vote count - only count non-spectator votes and players
+            const connectedPlayers = Object.values(session.users).filter(user => user.isConnected && !user.isSpectator);
+            const playerVotes = Object.keys(session.votes).filter(userId => 
+                session.users[userId] && !session.users[userId].isSpectator
+            );
+            const votesCount = playerVotes.length;
+            console.log(`Vote count update: ${votesCount}/${connectedPlayers.length} (Total users: ${Object.keys(session.users).length})`);
+            console.log('Connected players:', connectedPlayers.map(u => `${u.name}(spectator:${u.isSpectator})`));
             io.to(sessionId).emit('vote-count-updated', {
                 current: votesCount,
-                total: connectedUsers.length
+                total: connectedPlayers.length
             });
 
-            // Check if all connected users have voted
-            if (votesCount === connectedUsers.length) {
-                // Calculate results
-                const voteValues = Object.values(session.votes).filter(vote => vote !== '?');
-                const results = calculateResults(voteValues);
+            // Check if all connected players (non-spectators) have voted
+            const allPlayersVoted = connectedPlayers.length > 0 && connectedPlayers.every(user => session.votes[user.id]);
+            
+            if (allPlayersVoted) {
+                // Calculate results from non-spectator votes only
+                const playerVoteValues = Object.entries(session.votes)
+                    .filter(([userId]) => session.users[userId] && !session.users[userId].isSpectator)
+                    .map(([, vote]) => vote)
+                    .filter(vote => vote !== '?');
+                const results = calculateResults(playerVoteValues);
 
                 // Mark session as showing votes
                 session.showVotes = true;
@@ -599,26 +625,26 @@ io.on('connection', (socket) => {
             console.log('Reset votes requested for session:', sessionId);
 
             const session = sessions[sessionId];
-        if (session) {
-            // Reset session data
-            session.votes = {};
-            session.showVotes = false;
-            session.results = {};
+            if (session) {
+                // Reset session data
+                session.votes = {};
+                session.showVotes = false;
+                session.results = {};
 
-            console.log('Session data reset, notifying clients');
+                console.log('Session data reset, notifying clients');
 
-            // Notify all clients
-            io.to(sessionId).emit('votes-reset');
+                // Notify all clients
+                io.to(sessionId).emit('votes-reset');
 
-            // Also update vote count
-            const connectedUsers = Object.values(session.users).filter(user => user.isConnected);
-            io.to(sessionId).emit('vote-count-updated', {
-                current: 0,
-                total: connectedUsers.length
-            });
-        } else {
-            console.error('Session not found for reset:', sessionId);
-        }
+                // Also update vote count
+                const connectedPlayers = Object.values(session.users).filter(user => user.isConnected && !user.isSpectator);
+                io.to(sessionId).emit('vote-count-updated', {
+                    current: 0,
+                    total: connectedPlayers.length
+                });
+            } else {
+                console.error('Session not found for reset:', sessionId);
+            }
         } catch (error) {
             console.error('Error in reset-votes:', error);
             socket.emit('error', { message: 'Failed to reset votes' });
@@ -743,6 +769,54 @@ io.on('connection', (socket) => {
             });
         }
     });
+
+    socket.on('toggle-spectator', (data) => {
+        console.log('Server received toggle-spectator event:', data);
+        try {
+            const { sessionId, isSpectator, csrfToken } = data;
+            
+            if (!csrfToken || typeof csrfToken !== 'string' || csrfToken.length < 32) {
+                console.log('Invalid CSRF token');
+                socket.emit('error', { message: 'Invalid request' });
+                return;
+            }
+            
+            const session = sessions[sessionId];
+            if (!session || !session.users[socket.id]) {
+                socket.emit('error', { message: 'Session not found' });
+                return;
+            }
+            
+            console.log(`User ${socket.id} toggling spectator to ${isSpectator} in session ${sessionId}`);
+            
+            session.users[socket.id].isSpectator = isSpectator;
+            
+            if (isSpectator && session.votes[socket.id]) {
+                delete session.votes[socket.id];
+            }
+            
+            const updateData = {
+                userId: socket.id,
+                isSpectator,
+                userName: session.users[socket.id].name
+            };
+            
+            console.log('Broadcasting spectator-updated:', updateData);
+            io.to(sessionId).emit('spectator-updated', updateData);
+            
+            const connectedPlayers = Object.values(session.users).filter(user => user.isConnected && !user.isSpectator);
+            const playerVotes = Object.keys(session.votes).filter(userId => 
+                session.users[userId] && !session.users[userId].isSpectator
+            );
+            io.to(sessionId).emit('vote-count-updated', {
+                current: playerVotes.length,
+                total: connectedPlayers.length
+            });
+        } catch (error) {
+            console.error('Error toggling spectator:', error);
+            socket.emit('error', { message: 'Failed to toggle spectator mode' });
+        }
+    });
 });
 
 // Error handling middleware
@@ -805,6 +879,8 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const PORT = process.env.PORT || 3000;
+console.log('Starting server...');
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`=== SERVER STARTED ON PORT ${PORT} ===`);
+    console.log('Server is ready to accept connections');
 });

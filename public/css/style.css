@@ -2135,3 +2135,58 @@ audio {
         max-width: 4rem;
     }
 }
+
+/* Spectator Area Styles */
+#spectator-area {
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+
+
+.spectator-avatar {
+    transition: transform 0.3s ease;
+}
+
+.spectator-avatar:hover {
+    transform: scale(1.1);
+}
+
+@keyframes spectatorJoin {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.spectator-avatar {
+    animation: spectatorJoin 0.4s ease-out;
+}
+
+#spectator-toggle {
+    transition: all 0.3s ease;
+}
+
+#spectator-toggle:active {
+    transform: scale(0.95);
+}
+
+@media (max-width: 640px) {
+    #spectator-area {
+        bottom: 2px;
+        padding: 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .spectator-avatar .w-8 {
+        width: 1.75rem;
+        height: 1.75rem;
+    }
+}

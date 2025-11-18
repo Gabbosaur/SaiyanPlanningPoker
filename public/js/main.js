@@ -88,6 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const creditComponent = document.getElementById('credit-component');
     const heartButton = document.getElementById('heart-button');
     const creditCard = document.getElementById('credit-card');
+    const spectatorContainer = document.getElementById('spectator-container');
+    const joinAsSpectatorCheckbox = document.getElementById('join-as-spectator');
 
     // App State
     let sessionId = '';
@@ -106,7 +108,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let avatarFile = null;
     let heartbeatInterval = null;
     let isAnimating = false;
-    let currentSession = null; // Added to track current session state
+    let currentSession = null;
+    let isSpectator = false;
+
 
     // Audio for celebration with error handling
     const celebrationSound = new Audio('/sounds/super-saiyan.mp3');
@@ -132,6 +136,19 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.emit('heartbeat');
         }
     }, 30000); // Send heartbeat every 30 seconds
+
+    // Handle window resize to re-render UI state
+    window.addEventListener('resize', () => {
+        if (currentSession) {
+            updateVoteStatus(currentSession.participants);
+            renderParticipants(currentSession.participants);
+            if (currentSession.votes && Object.keys(currentSession.votes).length > 0) {
+                displayResults(currentSession.votes, currentSession.participants);
+            }
+        }
+    });
+
+
 
     // Reset button
     resetBtn.addEventListener('click', () => {
@@ -240,6 +257,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sessionId = sessionIdValue;
         user.name = usernameValue;
+        user.isSpectator = joinAsSpectatorCheckbox.checked;
+        isSpectator = user.isSpectator;
+        
+        console.log('Checkbox checked:', joinAsSpectatorCheckbox.checked);
+        console.log('User object being sent:', user);
 
         // Upload avatar if selected
         if (avatarFile) {
@@ -264,9 +286,16 @@ document.addEventListener('DOMContentLoaded', () => {
             socket = io();
             setupSocketListeners();
             startHeartbeat();
+            
+            // Test socket connection
+            setTimeout(() => {
+                console.log('Testing socket connection...');
+                socket.emit('test');
+            }, 1000);
         }
 
         // Join session
+        console.log('Emitting join-session with:', { sessionId, user, csrfToken: getCSRFToken() });
         socket.emit('join-session', {
             sessionId,
             user,
@@ -383,7 +412,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update participants
             participants = session.users;
+            isSpectator = session.users[socket.id]?.isSpectator || false;
             renderParticipants();
+            updateVoteStatus(participants);
 
             // Show existing votes if any
             if (session.showVotes && session.results) {
@@ -393,13 +424,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('user-joined', (newUser) => {
             participants[newUser.id] = newUser;
+            if (currentSession) {
+                currentSession.participants = participants;
+            }
             renderParticipants();
+            updateVoteStatus(participants);
         });
+
+
 
         socket.on('user-left', (userId) => {
             if (participants[userId]) {
                 delete participants[userId];
+                if (currentSession) {
+                    currentSession.participants = participants;
+                }
                 renderParticipants();
+                updateVoteStatus(participants);
             }
         });
 
@@ -427,6 +468,12 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('vote-updated', (data) => {
             const { userId, vote, voterName } = data;
 
+            // Update current session state
+            if (currentSession) {
+                if (!currentSession.votes) currentSession.votes = {};
+                currentSession.votes[userId] = vote;
+            }
+
             // Find the participant element
             const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
             if (participantEl) {
@@ -438,19 +485,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Add a visual indicator that this user has voted
                     participantEl.classList.add('user-has-voted');
-
-                    // // Add a subtle animation to draw attention
-                    // voteIndicator.classList.add('animate-pulse-once');
-                    // setTimeout(() => {
-                    //     voteIndicator.classList.remove('animate-pulse-once');
-                    // }, 1000);
                 }
             }
 
-            // // Show a notification that someone voted (optional)
-            // if (userId !== socket.id) {
-            //     showVoteNotification(voterName);
-            // }
+            // Update vote status
+            updateVoteStatus(participants);
 
             // Update card selection visual for the current user
             if (userId === socket.id) {
@@ -469,6 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update the current session state
             if (currentSession) {
+                currentSession.votes = votes;
                 currentSession.showVotes = true;
                 currentSession.results = results;
             }
@@ -661,6 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Rejoin the session if we have one
             if (sessionId && user.name) {
                 console.log('Rejoining session:', sessionId);
+                console.log('Rejoining with user:', user);
                 socket.emit('join-session', {
                     sessionId,
                     user,
@@ -688,11 +729,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+
+
+    // Update vote status display
+    function updateVoteStatus(participantsList) {
+        const connectedParticipants = Object.values(participantsList || participants).filter(p => p.isConnected && !p.isSpectator);
+        const totalConnected = connectedParticipants.length;
+        const votedCount = currentSession && currentSession.votes ? Object.keys(currentSession.votes).length : 0;
+        
+        voteCounter.textContent = `${votedCount}/${totalConnected} votes`;
+        
+        if (votedCount === 0) {
+            voteStatus.textContent = 'Waiting for votes...';
+        } else if (votedCount === totalConnected && totalConnected > 0) {
+            voteStatus.textContent = 'All votes in! Revealing results...';
+        } else {
+            const remaining = totalConnected - votedCount;
+            voteStatus.textContent = `${remaining} more to vote...`;
+        }
+    }
+
     // Render participants around the table
     function renderParticipants() {
         participantsContainer.innerHTML = '';
+        spectatorContainer.innerHTML = '';
+        
         const participantIds = Object.keys(participants);
-        const totalParticipants = participantIds.length;
+        const players = participantIds.filter(id => !participants[id].isSpectator);
+        const spectators = participantIds.filter(id => participants[id].isSpectator);
+        const totalParticipants = players.length;
 
         // Get the container dimensions
         const containerRect = participantsContainer.getBoundingClientRect();
@@ -724,8 +789,8 @@ document.addEventListener('DOMContentLoaded', () => {
             adjustedRadiusY *= 0.8;
         }
 
-        // Position participants in an oval
-        participantIds.forEach((id, index) => {
+        // Position players in an oval
+        players.forEach((id, index) => {
             const participant = participants[id];
             // Calculate angle for even distribution
             const angle = (index / totalParticipants) * 2 * Math.PI - Math.PI / 2; // Start from top
@@ -814,6 +879,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             participantsContainer.appendChild(participantEl);
+        });
+
+        // Show/hide spectator area
+        const spectatorArea = document.getElementById('spectator-area');
+        if (spectators.length === 0) {
+            spectatorArea.style.display = 'none';
+        } else {
+            spectatorArea.style.display = 'flex';
+        }
+
+        // Render spectators
+        spectators.forEach(id => {
+            const participant = participants[id];
+            const spectatorEl = document.createElement('div');
+            spectatorEl.className = 'spectator-avatar transition-all duration-300';
+            spectatorEl.setAttribute('data-user-id', id);
+            
+            let avatarContent;
+            if (participant.avatar) {
+                const img = document.createElement('img');
+                img.src = sanitizeInput(participant.avatar);
+                img.alt = sanitizeInput(participant.name);
+                img.className = 'w-full h-full object-cover';
+                avatarContent = img.outerHTML;
+            } else {
+                avatarContent = `<div class="w-full h-full bg-gray-700 flex items-center justify-center"><i class="fas fa-user text-sm text-gray-500"></i></div>`;
+            }
+            
+            spectatorEl.innerHTML = `
+                <div class="w-8 h-8 rounded-full overflow-hidden border-2 ${id === socket.id ? 'border-purple-400' : 'border-gray-600'} ${participant.isConnected ? '' : 'opacity-50'}" title="${sanitizeInput(participant.name)}">
+                    ${avatarContent}
+                </div>
+            `;
+            
+            spectatorContainer.appendChild(spectatorEl);
         });
 
         // Add a subtle animation to the table when users join/leave
@@ -1276,6 +1376,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadCards(cards) {
         currentCards = cards;
         cardsContainer.innerHTML = '';
+        
+        if (isSpectator) {
+            cardsContainer.classList.add('hidden');
+            return;
+        }
 
         cards.forEach((card, index) => {
             const cardEl = document.createElement('button');
@@ -1312,6 +1417,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentCards.length > 0) {
                 loadCards(currentCards);
             }
+
         }, 250);
     });
 
@@ -1620,7 +1726,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Reset voting
     function resetVoting() {
-        console.log('Resetting voting UI');
         hasVoted = false;
         cardsContainer.classList.remove('hidden');
         resultsArea.classList.add('hidden');
@@ -1654,7 +1759,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         voteStatus.textContent = 'Waiting for votes...';
         voteCounter.textContent = '0/0 votes';
-        console.log('Voting UI reset complete');
     }
 
     // Settings modal
