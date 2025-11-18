@@ -85,6 +85,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const emojiContainer = document.getElementById('emoji-container');
     const miniGameModal = document.getElementById('mini-game-modal');
     const punchSound = document.getElementById('punch-sound');
+    
+    // Array of punch sound files for random selection
+    const punchSounds = [
+        '/sounds/punch.mp3',
+        '/sounds/medium-punch.mp3', 
+        '/sounds/punch-heavy.mp3',
+        '/sounds/punch-heavy-2.mp3',
+        '/sounds/punch-heavy-3.mp3',
+        '/sounds/thrust-low.mp3',
+        '/sounds/thrust-low-2.mp3',
+        '/sounds/thrust1.mp3',
+        '/sounds/thrust2.mp3',
+        '/sounds/thrust3.mp3'
+    ];
     const creditComponent = document.getElementById('credit-component');
     const heartButton = document.getElementById('heart-button');
     const creditCard = document.getElementById('credit-card');
@@ -986,19 +1000,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add smooth animation class
         attackerEl.classList.add('animate-smooth-punch');
 
-        // Play punch sound with slight delay for impact timing
-        if (soundEnabled && punchSound) {
+        // Play random punch sound with slight delay for impact timing
+        if (soundEnabled) {
             setTimeout(() => {
                 try {
-                    const punchSoundClone = punchSound.cloneNode(true);
-                    const playPromise = punchSoundClone.play();
+                    const randomSound = punchSounds[Math.floor(Math.random() * punchSounds.length)];
+                    const audio = new Audio(randomSound);
+                    const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         playPromise.catch(error => {
                             console.warn('Error playing punch sound:', error);
                         });
                     }
                 } catch (error) {
-                    console.warn('Error creating punch sound clone:', error);
+                    console.warn('Error creating punch sound:', error);
                 }
             }, 600); // Time to reach the target (50% of 1.2s)
         }
@@ -1086,19 +1101,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add smooth animation class
         attackerEl.classList.add('animate-smooth-punch');
 
-        // Play punch sound with slight delay for impact timing
-        if (soundEnabled && punchSound) {
+        // Play random punch sound with slight delay for impact timing
+        if (soundEnabled) {
             setTimeout(() => {
                 try {
-                    const punchSoundClone = punchSound.cloneNode(true);
-                    const playPromise = punchSoundClone.play();
+                    const randomSound = punchSounds[Math.floor(Math.random() * punchSounds.length)];
+                    const audio = new Audio(randomSound);
+                    const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         playPromise.catch(error => {
                             console.warn('Error playing punch sound:', error);
                         });
                     }
                 } catch (error) {
-                    console.warn('Error creating punch sound clone:', error);
+                    console.warn('Error creating punch sound:', error);
                 }
             }, 600); // Time to reach the target (50% of 1.2s)
         }
