@@ -1765,7 +1765,9 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsBtn.addEventListener('click', () => {
         settingsModal.classList.remove('hidden');
         soundToggle.checked = soundEnabled;
-        themeSelector.value = 'halloween'; // Set to match default theme
+        const now = new Date();
+        const christmasStart = new Date('2025-12-08');
+        themeSelector.value = now >= christmasStart ? 'christmas' : 'dbz';
         deckSelector.value = currentDeckType;
 
         // Update avatar preview
@@ -1811,6 +1813,10 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'halloween':
                 document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden', 'halloween-theme');
                 scheduleHalloweenElements();
+                break;
+            case 'christmas':
+                document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden', 'christmas-theme');
+                scheduleChristmasElements();
                 break;
             case 'dark':
                 document.body.classList.add('bg-gray-900', 'min-h-screen', 'text-white', 'overflow-hidden', 'dark-mode');
@@ -2598,6 +2604,92 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => halloweenEl.remove(), animationDuration);
     }
 
+    // Christmas gift messages
+    const giftMessages = [
+        "🎁 Merry Christmas!",
+        "🎄 Ho ho ho!",
+        "✨ Christmas magic!",
+        "🎅 Santa was here!",
+        "⭐ Make a wish!",
+        "🔔 Jingle bells!",
+        "❄️ Let it snow!",
+        "🎊 Joy to the world!",
+        "🕯️ Peace on earth!",
+        "🎵 Skibidi boppy!",
+        "👥 We wish for new young hires!",
+        "🥖 Fugassa!"
+    ];
+
+    function showGiftMessage(x, y) {
+        const message = giftMessages[Math.floor(Math.random() * giftMessages.length)];
+        const messageEl = document.createElement('div');
+        messageEl.className = 'fixed pointer-events-none z-50 bg-red-600 text-white px-3 py-2 rounded-lg shadow-lg text-sm font-medium';
+        messageEl.style.left = `${x}px`;
+        messageEl.style.top = `${y - 40}px`;
+        messageEl.style.transform = 'translateX(-50%)';
+        messageEl.textContent = message;
+        messageEl.style.opacity = '0';
+        messageEl.style.transition = 'all 0.3s ease';
+        
+        document.body.appendChild(messageEl);
+        
+        setTimeout(() => {
+            messageEl.style.opacity = '1';
+            messageEl.style.transform = 'translateX(-50%) translateY(-10px)';
+        }, 10);
+        
+        setTimeout(() => {
+            messageEl.style.opacity = '0';
+            messageEl.style.transform = 'translateX(-50%) translateY(-20px)';
+            setTimeout(() => messageEl.remove(), 300);
+        }, 2000);
+    }
+
+    // Christmas animation system
+    function createChristmasElement() {
+        const isChristmas = document.body.classList.contains('christmas-theme');
+        if (!isChristmas) return;
+
+        const elements = [
+            { emoji: '❄️', class: 'christmas-snowflake' },
+            { emoji: '🎄', class: 'christmas-tree' },
+            { emoji: '🎅', class: 'christmas-santa' },
+            { emoji: '🎁', class: 'christmas-gift' },
+            { emoji: '⭐', class: 'christmas-star' }
+        ];
+        
+        const element = elements[Math.floor(Math.random() * elements.length)];
+        const christmasEl = document.createElement('div');
+        christmasEl.className = `christmas-floating ${element.class}`;
+        christmasEl.textContent = element.emoji;
+        
+        // Add click event for gift emoji
+        if (element.class === 'christmas-gift') {
+            christmasEl.style.cursor = 'pointer';
+            christmasEl.style.pointerEvents = 'auto';
+            christmasEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const rect = christmasEl.getBoundingClientRect();
+                showGiftMessage(rect.left + rect.width / 2, rect.top);
+            });
+        }
+        
+        if (element.class === 'christmas-snowflake') {
+            christmasEl.style.top = '-50px';
+            christmasEl.style.left = `${Math.random() * 100}%`;
+        } else {
+            christmasEl.style.top = `${Math.random() * 80 + 10}%`;
+            christmasEl.style.left = '-50px';
+        }
+        
+        document.body.appendChild(christmasEl);
+        
+        const animationDuration = element.class === 'christmas-snowflake' ? 8000 : 
+                                 element.class === 'christmas-tree' ? 15000 : 
+                                 element.class === 'christmas-santa' ? 12000 : 10000;
+        setTimeout(() => christmasEl.remove(), animationDuration);
+    }
+
     // Halloween theme toggle
     function toggleHalloweenTheme(enable) {
         if (enable) {
@@ -2606,6 +2698,17 @@ document.addEventListener('DOMContentLoaded', () => {
             scheduleHalloweenElements();
         } else {
             document.body.classList.remove('halloween-theme');
+        }
+    }
+
+    // Christmas theme toggle
+    function toggleChristmasTheme(enable) {
+        if (enable) {
+            document.body.classList.add('christmas-theme');
+            // Start Christmas animations
+            scheduleChristmasElements();
+        } else {
+            document.body.classList.remove('christmas-theme');
         }
     }
 
@@ -2671,6 +2774,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000 + Math.random() * 10000);
     }
 
+    // Christmas element scheduler
+    function scheduleChristmasElements() {
+        const isChristmas = document.body.classList.contains('christmas-theme');
+        if (!isChristmas) return;
+        
+        setTimeout(() => {
+            createChristmasElement();
+            scheduleChristmasElements();
+        }, 3000 + Math.random() * 8000);
+    }
+
     // Theme selector handler
     if (themeSelector) {
         themeSelector.addEventListener('change', function() {
@@ -2682,15 +2796,19 @@ document.addEventListener('DOMContentLoaded', () => {
             // Apply selected theme
             if (theme === 'halloween') {
                 toggleHalloweenTheme(true);
+            } else if (theme === 'christmas') {
+                toggleChristmasTheme(true);
             }
             
             // Save theme preference
             localStorage.setItem('selectedTheme', theme);
         });
         
-        // Clear any existing theme and set default
+        // Clear any existing theme and set default based on date
         localStorage.removeItem('selectedTheme');
-        const savedTheme = 'halloween';
+        const now = new Date();
+        const christmasStart = new Date('2025-12-08');
+        const savedTheme = now >= christmasStart ? 'christmas' : 'dbz';
         themeSelector.value = savedTheme;
         applyTheme(savedTheme);
     }
