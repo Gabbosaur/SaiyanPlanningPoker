@@ -1,0 +1,260 @@
+/* Monthly Themes with Easter Eggs */
+
+/* January - Snow Theme */
+body.monthly-theme[data-month="0"] {
+    background: linear-gradient(135deg, #1a2332 0%, #2d3e50 50%, #34495e 100%);
+}
+
+body.monthly-theme[data-month="0"]::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(173,216,230,0.1) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.monthly-snowflake {
+    position: fixed;
+    color: #fff;
+    font-size: 1rem;
+    opacity: 0.8;
+    animation: snowfall 8s linear infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+    transition: transform 0.2s;
+}
+
+.monthly-snowflake:hover {
+    transform: scale(1.5);
+}
+
+@keyframes snowfall {
+    0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.8; }
+    90% { opacity: 0.8; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+}
+
+/* February - Valentine Theme */
+body.monthly-theme[data-month="1"] {
+    background: linear-gradient(135deg, #2d1b2e 0%, #4a2545 50%, #6b3a5c 100%);
+}
+
+.monthly-heart {
+    position: fixed;
+    font-size: 1.5rem;
+    animation: heartFloat 6s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+    filter: drop-shadow(0 0 10px rgba(255,105,180,0.5));
+}
+
+@keyframes heartFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(10deg); }
+}
+
+/* March - Spring Theme */
+body.monthly-theme[data-month="2"] {
+    background: linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 50%, #4a7a4a 100%);
+}
+
+.monthly-flower {
+    position: fixed;
+    font-size: 1.2rem;
+    animation: flowerGrow 4s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+}
+
+@keyframes flowerGrow {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.2) rotate(5deg); }
+}
+
+/* April - Rain Theme */
+body.monthly-theme[data-month="3"] {
+    background: linear-gradient(135deg, #1a2a3a 0%, #2d4a5a 50%, #3a5a6a 100%);
+}
+
+.monthly-raindrop {
+    position: fixed;
+    color: #87ceeb;
+    font-size: 1rem;
+    animation: rainfall 3s linear infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+}
+
+@keyframes rainfall {
+    0% { transform: translateY(-10vh); opacity: 0.8; }
+    100% { transform: translateY(110vh); opacity: 0; }
+}
+
+/* May - Flowers Theme */
+body.monthly-theme[data-month="4"] {
+    background: linear-gradient(135deg, #2a1a3a 0%, #4a3a5a 50%, #6a5a7a 100%);
+}
+
+.monthly-blossom {
+    position: fixed;
+    font-size: 1.3rem;
+    animation: blossomFloat 8s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+}
+
+@keyframes blossomFloat {
+    0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(110vh) translateX(50px) rotate(360deg); opacity: 0; }
+}
+
+/* June - Summer Theme */
+body.monthly-theme[data-month="5"] {
+    background: linear-gradient(135deg, #1a3a4a 0%, #2d5a6a 50%, #4a7a8a 100%);
+}
+
+.monthly-sun {
+    position: fixed;
+    font-size: 2rem;
+    animation: sunPulse 3s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+    filter: drop-shadow(0 0 20px rgba(255,215,0,0.6));
+}
+
+@keyframes sunPulse {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.1) rotate(180deg); }
+}
+
+/* July - Beach Theme */
+body.monthly-theme[data-month="6"] {
+    background: linear-gradient(135deg, #1a4a5a 0%, #2d6a7a 50%, #4a8a9a 100%);
+}
+
+.monthly-wave {
+    position: fixed;
+    font-size: 1.5rem;
+    animation: waveMotion 4s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+}
+
+@keyframes waveMotion {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    50% { transform: translateX(20px) rotate(10deg); }
+}
+
+/* August - Sunset Theme */
+body.monthly-theme[data-month="7"] {
+    background: linear-gradient(135deg, #3a2a1a 0%, #5a4a3a 50%, #7a6a5a 100%);
+}
+
+.monthly-star {
+    position: fixed;
+    font-size: 1rem;
+    animation: starTwinkle 2s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+}
+
+@keyframes starTwinkle {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.3); }
+}
+
+/* September - Autumn Theme */
+body.monthly-theme[data-month="8"] {
+    background: linear-gradient(135deg, #2a1a0a 0%, #4a3a2a 50%, #6a5a4a 100%);
+}
+
+.monthly-leaf {
+    position: fixed;
+    font-size: 1.2rem;
+    animation: leafFall 10s linear infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+}
+
+@keyframes leafFall {
+    0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+/* October - Halloween Theme */
+body.monthly-theme[data-month="9"] {
+    background: linear-gradient(135deg, #1a0a1a 0%, #2a1a2a 50%, #3a2a3a 100%);
+}
+
+.monthly-pumpkin {
+    position: fixed;
+    font-size: 1.5rem;
+    animation: pumpkinBounce 3s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+    filter: drop-shadow(0 0 15px rgba(255,140,0,0.6));
+}
+
+@keyframes pumpkinBounce {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-15px) rotate(5deg); }
+}
+
+/* November - Thanksgiving Theme */
+body.monthly-theme[data-month="10"] {
+    background: linear-gradient(135deg, #2a1a0a 0%, #4a3a1a 50%, #6a5a3a 100%);
+}
+
+.monthly-turkey {
+    position: fixed;
+    font-size: 1.5rem;
+    animation: turkeyWalk 5s linear infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+}
+
+@keyframes turkeyWalk {
+    0% { transform: translateX(-10vw); }
+    100% { transform: translateX(110vw); }
+}
+
+/* December - Christmas Theme */
+body.monthly-theme[data-month="11"] {
+    background: linear-gradient(135deg, #0a1a2a 0%, #1a2a3a 50%, #2a3a4a 100%);
+}
+
+.monthly-gift {
+    position: fixed;
+    font-size: 1.5rem;
+    animation: giftShake 2s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 100;
+    filter: drop-shadow(0 0 10px rgba(255,215,0,0.5));
+}
+
+@keyframes giftShake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-5deg); }
+    75% { transform: rotate(5deg); }
+}
+
+

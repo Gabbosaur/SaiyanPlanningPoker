@@ -707,33 +707,30 @@
 
 @keyframes super-saiyan {
     0% {
-        transform: scale(0.8) rotate(0deg);
-        filter: brightness(1) saturate(1);
+        transform: scale(1);
     }
 
-    20% {
-        transform: scale(1.2) rotate(5deg);
-        filter: brightness(1.5) saturate(1.5);
-    }
-
-    40% {
-        transform: scale(0.9) rotate(-5deg);
-        filter: brightness(2) saturate(2);
-    }
-
-    60% {
-        transform: scale(1.1) rotate(3deg);
-        filter: brightness(2.5) saturate(2.5);
-    }
-
-    80% {
-        transform: scale(0.95) rotate(-2deg);
-        filter: brightness(3) saturate(3);
+    50% {
+        transform: scale(1.05);
     }
 
     100% {
-        transform: scale(1) rotate(0deg);
-        filter: brightness(3.5) saturate(3.5);
+        transform: scale(1);
+    }
+}
+
+.animate-consensus-pulse {
+    animation: consensus-pulse 2s ease-in-out infinite;
+}
+
+@keyframes consensus-pulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.05);
+        filter: brightness(1.2);
     }
 }
 

@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/css/card-animations.css">
     <link rel="stylesheet" href="/css/card-deal.css">
     <link rel="stylesheet" href="/css/halloween-theme.css">
+    <link rel="stylesheet" href="/css/monthly-themes.css">
     <link rel="stylesheet" href="/css/christmas-theme.css">
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -269,9 +270,9 @@
                 <!-- Super Saiyan transformation with fallback -->
                 <div id="celebration-sprite" class="relative mx-auto">
                     <!-- Image with error handling -->
-                    <div class="relative z-10 animate-super-saiyan" style="width: 16rem; height: 20rem;">
-                        <img id="super-saiyan-img" src="/images/ssj.gif" alt="Super Saiyan"
-                            class="w-full h-full object-contain hidden">
+                    <div class="relative z-10 animate-consensus-pulse" style="max-width: 600px; max-height: 600px;">
+                        <img id="super-saiyan-img" src="/images/ssj.gif" alt="Consensus"
+                            class="w-full h-full object-contain hidden rounded-3xl">
                         <!-- Fallback CSS Super Saiyan -->
                         <div id="super-saiyan-fallback" class="w-full h-full flex items-center justify-center">
                             <div class="relative">
@@ -351,6 +352,7 @@
                 <select id="theme-selector"
                     class="w-full px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
                     <option value="dbz" selected>Dragon Ball Z</option>
+                    <option value="monthly">Monthly Theme (Auto)</option>
                     <option value="christmas">Christmas Magic</option>
                     <option value="dark">Dark Mode</option>
                 </select>

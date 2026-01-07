@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentCards = [];
     let hasVoted = false;
     let soundEnabled = true;
-    let currentTheme = 'dbz';
+    let currentTheme = 'monthly';
     let currentDeckType = 'modifiedFibonacci';
     let socket = null;
     let avatarFile = null;
@@ -1787,9 +1787,7 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsBtn.addEventListener('click', () => {
         settingsModal.classList.remove('hidden');
         soundToggle.checked = soundEnabled;
-        const now = new Date();
-        const christmasStart = new Date('2025-12-08');
-        themeSelector.value = now >= christmasStart ? 'christmas' : 'dbz';
+        themeSelector.value = currentTheme;
         deckSelector.value = currentDeckType;
 
         // Update avatar preview
@@ -1809,7 +1807,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveSettings.addEventListener('click', () => {
         soundEnabled = soundToggle.checked;
-        currentTheme = themeSelector.value;
+        const newTheme = themeSelector.value;
+        currentTheme = newTheme;
 
         // Check if deck has changed
         const newDeckType = deckSelector.value;
@@ -1825,12 +1824,35 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsModal.classList.add('hidden');
     });
 
+    // Monthly theme messages
+    const monthlyMessages = [
+        { emoji: '❄️', title: 'Happy New Year!', subtitle: 'Fresh start, new goals! ⛷️' },
+        { emoji: '💝', title: 'Love is in the air!', subtitle: 'Spread the love this February! 💕' },
+        { emoji: '🌸', title: 'Spring has sprung!', subtitle: 'Time to bloom and grow! 🌱' },
+        { emoji: '🌧️', title: 'April showers!', subtitle: 'Bringing May flowers! ☔' },
+        { emoji: '🌺', title: 'May flowers!', subtitle: 'Beauty is everywhere! 🦋' },
+        { emoji: '☀️', title: 'Summer vibes!', subtitle: 'Time to shine bright! 🏖️' },
+        { emoji: '🏄', title: 'Beach time!', subtitle: 'Surf\'s up! Catch the wave! 🌊' },
+        { emoji: '🌅', title: 'Summer nights!', subtitle: 'Make wishes on shooting stars! ⭐' },
+        { emoji: '🍂', title: 'Autumn leaves!', subtitle: 'Change is beautiful! 🍁' },
+        { emoji: '🎃', title: 'Spooky season!', subtitle: 'Trick or treat! 👻' },
+        { emoji: '🦃', title: 'Thanksgiving!', subtitle: 'Grateful for the team! 🙏' },
+        { emoji: '🎄', title: 'Merry Christmas!', subtitle: 'Ho ho ho! 🎅' }
+    ];
+
     // Apply theme - Updated to remove light mode
     function applyTheme(theme) {
         document.body.className = '';
+        document.body.removeAttribute('data-month');
         switch (theme) {
             case 'dbz':
                 document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden');
+                break;
+            case 'monthly':
+                const month = new Date().getMonth();
+                document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden', 'monthly-theme');
+                document.body.setAttribute('data-month', month);
+                scheduleMonthlyElements();
                 break;
             case 'halloween':
                 document.body.classList.add('dbz-bg', 'min-h-screen', 'text-white', 'overflow-hidden', 'halloween-theme');
@@ -1844,6 +1866,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.classList.add('bg-gray-900', 'min-h-screen', 'text-white', 'overflow-hidden', 'dark-mode');
                 break;
         }
+    }
+
+    // Monthly theme elements
+    function createMonthlyElement() {
+        const month = new Date().getMonth();
+        const elements = [
+            { emoji: '❄️', class: 'monthly-snowflake' },
+            { emoji: '💝', class: 'monthly-heart' },
+            { emoji: '🌸', class: 'monthly-flower' },
+            { emoji: '💧', class: 'monthly-raindrop' },
+            { emoji: '🌺', class: 'monthly-blossom' },
+            { emoji: '☀️', class: 'monthly-sun' },
+            { emoji: '🌊', class: 'monthly-wave' },
+            { emoji: '⭐', class: 'monthly-star' },
+            { emoji: '🍂', class: 'monthly-leaf' },
+            { emoji: '🎃', class: 'monthly-pumpkin' },
+            { emoji: '🦃', class: 'monthly-turkey' },
+            { emoji: '🎁', class: 'monthly-gift' }
+        ];
+        
+        const element = elements[month];
+        const el = document.createElement('div');
+        el.className = element.class;
+        el.textContent = element.emoji;
+        el.style.left = `${Math.random() * 90 + 5}%`;
+        el.style.top = month === 10 ? '50%' : '-50px';
+        
+        el.addEventListener('click', (e) => showMonthlyMessage(month, e));
+        document.body.appendChild(el);
+        
+        const duration = month === 0 ? 8000 : month === 8 ? 10000 : month === 10 ? 5000 : 6000;
+        setTimeout(() => el.remove(), duration);
+    }
+
+    function showMonthlyMessage(month, event) {
+        const msg = monthlyMessages[month];
+        const popup = document.createElement('div');
+        popup.className = 'fixed bg-gray-800 bg-opacity-95 text-white px-4 py-3 rounded-lg shadow-lg z-50 transition-all duration-300 border border-yellow-500';
+        popup.style.maxWidth = '300px';
+        popup.style.left = `${event.clientX}px`;
+        popup.style.top = `${event.clientY - 80}px`;
+        popup.style.transform = 'translateX(-50%)';
+        popup.innerHTML = `
+            <div class="text-center">
+                <div class="text-3xl mb-1">${msg.emoji}</div>
+                <div class="font-bold text-yellow-400">${msg.title}</div>
+                <div class="text-sm text-gray-300">${msg.subtitle}</div>
+            </div>
+        `;
+        
+        document.body.appendChild(popup);
+        
+        setTimeout(() => {
+            popup.style.opacity = '0';
+            popup.style.transform = 'translateX(-50%) translateY(-10px)';
+            setTimeout(() => popup.remove(), 300);
+        }, 3000);
+    }
+
+    function scheduleMonthlyElements() {
+        if (!document.body.classList.contains('monthly-theme')) return;
+        setTimeout(() => {
+            createMonthlyElement();
+            scheduleMonthlyElements();
+        }, 4000 + Math.random() * 6000);
     }
 
     // Update triggerCelebration function for the new animation with image error handling
@@ -1870,7 +1957,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // Force reload the image to trigger onerror if needed
-        superSaiyanImg.src = '/images/ssj.gif?' + new Date().getTime();
+        superSaiyanImg.src = '/images/consensus/consensus-celebrate.gif?' + new Date().getTime();
 
         // Play sound if enabled
         if (soundEnabled) {
@@ -1892,10 +1979,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Hide celebration after animation completes
+        // Hide celebration after animation completes with fade out
         setTimeout(() => {
-            celebrationOverlay.classList.add('hidden');
-        }, 5000);
+            celebrationOverlay.style.transition = 'opacity 1s ease-out';
+            celebrationOverlay.style.opacity = '0';
+            setTimeout(() => {
+                celebrationOverlay.classList.add('hidden');
+                celebrationOverlay.style.opacity = '';
+                celebrationOverlay.style.transition = '';
+            }, 1000);
+        }, 4000);
     }
 
     // Emoji reactions
@@ -2825,26 +2918,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (themeSelector) {
         themeSelector.addEventListener('change', function() {
             const theme = this.value;
-            
-            // Remove all theme classes
-            document.body.classList.remove('halloween-theme');
-            
-            // Apply selected theme
-            if (theme === 'halloween') {
-                toggleHalloweenTheme(true);
-            } else if (theme === 'christmas') {
-                toggleChristmasTheme(true);
-            }
-            
-            // Save theme preference
+            applyTheme(theme);
             localStorage.setItem('selectedTheme', theme);
         });
         
-        // Clear any existing theme and set default based on date
-        localStorage.removeItem('selectedTheme');
-        const now = new Date();
-        const christmasStart = new Date('2025-12-08');
-        const savedTheme = now >= christmasStart ? 'christmas' : 'dbz';
+        // Set monthly theme as default
+        const savedTheme = localStorage.getItem('selectedTheme') || 'monthly';
         themeSelector.value = savedTheme;
         applyTheme(savedTheme);
     }
