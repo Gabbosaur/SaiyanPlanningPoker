@@ -1957,7 +1957,18 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // Force reload the image to trigger onerror if needed
-        superSaiyanImg.src = '/images/consensus/consensus-celebrate.gif?' + new Date().getTime();
+        // Array of consensus celebration GIFs
+        const consensusGifs = [
+            '/images/consensus/consensus-celebrate-hd-1.gif',
+            '/images/consensus/consensus-celebrate-hd-2.gif',
+            '/images/consensus/consensus-celebrate-hd-3.gif'
+        ];
+
+        // Select random GIF
+        const randomGif = consensusGifs[Math.floor(Math.random() * consensusGifs.length)];
+
+        // Load random GIF
+        superSaiyanImg.src = randomGif + '?' + new Date().getTime();
 
         // Play sound if enabled
         if (soundEnabled) {
