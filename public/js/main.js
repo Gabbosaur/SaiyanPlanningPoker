@@ -1896,7 +1896,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el.addEventListener('click', (e) => showMonthlyMessage(month, e));
         document.body.appendChild(el);
         
-        const duration = month === 0 ? 8000 : month === 8 ? 10000 : month === 10 ? 5000 : 6000;
+        const duration = month === 0 ? 14000 : month === 3 ? 8000 : month === 4 ? 14000 : month === 8 ? 16000 : month === 10 ? 5000 : 6000;
         setTimeout(() => el.remove(), duration);
     }
 
@@ -2164,6 +2164,8 @@ document.addEventListener('DOMContentLoaded', () => {
             { title: "Skill Shop", src: "/music/Skill Shop.mp3", duration: "4:05" },
             { title: "Dragon Arena", src: "/music/Dragon Arena.mp3", duration: "6:02" },
             { title: "Team Saiyan (EN)", src: "/music/Team Saiyan EN.mp3", duration: "2:42" },
+            { title: "DB GT Opening (MJ Style)", src: "/music/Dragon Ball GT Opening (DBGT) - Michael Jackson Style.mp3", duration: "3:28" },
+            { title: "Makafushigi Adventure (MJ Style)", src: "/music/Makafushigi Adventure (DBZ) - Michael Jackson Style.mp3", duration: "3:41" },
         ],
         currentSongIndex: -1,
         audio: new Audio(),
