@@ -2177,66 +2177,282 @@ audio {
 
 
 /* Consensus Streak Glow - Table aura grows brighter with each consecutive consensus.
-   Activates from streak 3 onwards. The table already has a ::before pulsing border. */
-.dbz-table.streak-3 {
-    box-shadow: 0 0 35px rgba(249, 215, 28, 0.35), 0 0 60px rgba(249, 215, 28, 0.15);
+   Progression: 2 = gold (visible), 3 = gold/orange, 4 = red, 5+ = max. */
+.dbz-table.streak-2 {
+    box-shadow: 0 0 35px rgba(249, 215, 28, 0.5), 0 0 60px rgba(249, 215, 28, 0.25);
 }
 
-.dbz-table.streak-3::before {
-    opacity: 0.9;
+.dbz-table.streak-2::before {
+    opacity: 1;
     background: radial-gradient(ellipse at center,
-        rgba(249, 215, 28, 0.25) 0%,
+        rgba(249, 215, 28, 0.35) 0%,
         transparent 70%);
 }
 
+.dbz-table.streak-3 {
+    box-shadow: 0 0 55px rgba(249, 215, 28, 0.6), 0 0 100px rgba(255, 149, 0, 0.35);
+}
+
+.dbz-table.streak-3::before {
+    opacity: 1;
+    background: radial-gradient(ellipse at center,
+        rgba(249, 215, 28, 0.45) 0%,
+        rgba(255, 149, 0, 0.2) 55%,
+        transparent 85%);
+    animation: border-pulse 2s infinite;
+}
+
 .dbz-table.streak-4 {
-    box-shadow: 0 0 50px rgba(249, 215, 28, 0.5), 0 0 90px rgba(255, 149, 0, 0.25);
+    box-shadow: 0 0 75px rgba(255, 149, 0, 0.7), 0 0 140px rgba(239, 68, 68, 0.45);
 }
 
 .dbz-table.streak-4::before {
     opacity: 1;
     background: radial-gradient(ellipse at center,
-        rgba(249, 215, 28, 0.35) 0%,
-        rgba(255, 149, 0, 0.15) 50%,
-        transparent 80%);
+        rgba(255, 149, 0, 0.5) 0%,
+        rgba(239, 68, 68, 0.3) 60%,
+        transparent 90%);
+    animation: border-pulse 1.3s infinite;
 }
 
 .dbz-table.streak-5 {
-    box-shadow: 0 0 65px rgba(255, 149, 0, 0.6), 0 0 120px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 90px rgba(239, 68, 68, 0.8), 0 0 180px rgba(220, 38, 38, 0.55);
 }
 
 .dbz-table.streak-5::before {
     opacity: 1;
     background: radial-gradient(ellipse at center,
-        rgba(255, 149, 0, 0.4) 0%,
-        rgba(239, 68, 68, 0.2) 60%,
-        transparent 90%);
-    animation: border-pulse 1.8s infinite;
-}
-
-.dbz-table.streak-6 {
-    box-shadow: 0 0 80px rgba(255, 149, 0, 0.75), 0 0 160px rgba(239, 68, 68, 0.45);
-}
-
-.dbz-table.streak-6::before {
-    opacity: 1;
-    background: radial-gradient(ellipse at center,
-        rgba(255, 149, 0, 0.5) 0%,
-        rgba(239, 68, 68, 0.3) 60%,
-        transparent 95%);
-    animation: border-pulse 1.3s infinite;
+        rgba(239, 68, 68, 0.55) 0%,
+        rgba(220, 38, 38, 0.35) 60%,
+        transparent 92%);
+    animation: border-pulse 1s infinite;
 }
 
 .dbz-table.streak-max {
-    box-shadow: 0 0 100px rgba(239, 68, 68, 0.9), 0 0 200px rgba(249, 215, 28, 0.6);
+    box-shadow: 0 0 110px rgba(239, 68, 68, 0.95), 0 0 220px rgba(249, 215, 28, 0.7);
 }
 
 .dbz-table.streak-max::before {
     opacity: 1;
     background: radial-gradient(ellipse at center,
-        rgba(255, 255, 220, 0.4) 0%,
+        rgba(255, 255, 220, 0.45) 0%,
         rgba(255, 149, 0, 0.55) 40%,
-        rgba(239, 68, 68, 0.3) 75%,
+        rgba(239, 68, 68, 0.35) 75%,
         transparent 100%);
-    animation: border-pulse 0.9s infinite;
+    animation: border-pulse 0.8s infinite;
+}
+
+
+/* Vote hint badges + breakdown card highlights: shown after reveal when votes differ.
+   Applied only inside the Individual Votes breakdown (not on the table avatars,
+   where the results overlay covers them). The badge is placed inside the card
+   (top-right corner) so it's never clipped by parent overflow. */
+.vote-hint-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.7px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 20;
+    line-height: 1.1;
+}
+
+.vote-hint-badge-min {
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+}
+
+.vote-hint-badge-max {
+    background: linear-gradient(135deg, #dc2626, #f87171);
+}
+
+
+/* Individual Votes breakdown: highlight LOW / HIGH voters after reveal */
+.breakdown-hint-min {
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.5), inset 0 0 12px rgba(96, 165, 250, 0.15);
+}
+
+.breakdown-hint-max {
+    border-color: #f87171 !important;
+    box-shadow: 0 0 10px rgba(248, 113, 113, 0.5), inset 0 0 12px rgba(248, 113, 113, 0.15);
+}
+
+
+/* Consensus streak banner - shown at streak >= 3 */
+.streak-banner {
+    position: fixed;
+    top: 28%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.3);
+    z-index: 9998;
+    pointer-events: none;
+    text-align: center;
+    animation: streak-banner-show 2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    will-change: transform, opacity;
+    opacity: 0;
+}
+
+.streak-banner-combo {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    font-weight: 900;
+    color: #fbbf24;
+    letter-spacing: 4px;
+    text-shadow:
+        0 0 10px #fbbf24,
+        0 0 20px #f59e0b,
+        0 3px 6px rgba(0, 0, 0, 0.8);
+    margin-bottom: 4px;
+    transform: skewX(-8deg);
+}
+
+.streak-banner-number {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(4rem, 14vw, 9rem);
+    font-weight: 900;
+    line-height: 0.9;
+    color: #fff;
+    text-shadow:
+        0 0 20px #fbbf24,
+        0 0 40px #f59e0b,
+        0 0 70px #ff6600,
+        0 6px 12px rgba(0, 0, 0, 0.7);
+    animation: streak-banner-shake 0.5s ease-in-out;
+    transform: skewX(-8deg);
+}
+
+.streak-banner-label {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(1.4rem, 3.5vw, 2.4rem);
+    font-weight: 900;
+    color: #ff9500;
+    letter-spacing: 3px;
+    text-shadow:
+        0 0 8px #ff9500,
+        0 0 18px #ff6600,
+        0 3px 6px rgba(0, 0, 0, 0.8);
+    margin-top: 4px;
+    transform: skewX(-8deg);
+}
+
+/* Tiered colors: from gold -> orange -> red as the streak grows */
+.streak-banner.tier-warm .streak-banner-number {
+    color: #fff8dc;
+    text-shadow:
+        0 0 20px #fbbf24,
+        0 0 40px #ff9500,
+        0 0 70px #ff6600,
+        0 6px 12px rgba(0, 0, 0, 0.7);
+}
+
+.streak-banner.tier-hot .streak-banner-number {
+    color: #fff;
+    text-shadow:
+        0 0 20px #ff9500,
+        0 0 40px #ef4444,
+        0 0 80px #dc2626,
+        0 6px 14px rgba(0, 0, 0, 0.8);
+}
+.streak-banner.tier-hot .streak-banner-label {
+    color: #f87171;
+    text-shadow:
+        0 0 10px #ef4444,
+        0 0 24px #dc2626,
+        0 3px 6px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes streak-banner-show {
+    0% {
+        transform: translate(-50%, -50%) scale(0.3);
+        opacity: 0;
+        filter: blur(8px);
+    }
+    15% {
+        transform: translate(-50%, -50%) scale(1.25);
+        opacity: 1;
+        filter: blur(0);
+    }
+    25% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    75% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(0.85);
+        opacity: 0;
+    }
+}
+
+@keyframes streak-banner-shake {
+    0%, 100% { transform: skewX(-8deg) translateX(0); }
+    25% { transform: skewX(-8deg) translateX(-6px); }
+    75% { transform: skewX(-8deg) translateX(6px); }
+}
+
+/* Radial energy burst behind the banner */
+.streak-banner-burst {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 300px;
+    height: 300px;
+    margin-top: -150px;
+    margin-left: -150px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+        rgba(255, 255, 220, 0.4) 0%,
+        rgba(249, 215, 28, 0.25) 30%,
+        rgba(255, 149, 0, 0.12) 55%,
+        transparent 80%);
+    transform: scale(0);
+    opacity: 0;
+    pointer-events: none;
+    animation: streak-banner-burst-anim 2s ease-out forwards;
+    z-index: -1;
+}
+
+@keyframes streak-banner-burst-anim {
+    0%   { transform: scale(0); opacity: 0; }
+    20%  { transform: scale(1); opacity: 1; }
+    50%  { transform: scale(1.6); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+
+/* Super Saiyan 2 electric sparks - active while streak >= 4 */
+.ssj2-spark {
+    position: fixed;
+    pointer-events: none;
+    z-index: 5;
+    width: 2px;
+    background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.95) 10%,
+        #60a5fa 40%,
+        #3b82f6 70%,
+        transparent 100%);
+    filter:
+        drop-shadow(0 0 4px rgba(147, 197, 253, 0.95))
+        drop-shadow(0 0 10px rgba(59, 130, 246, 0.7));
+    transform-origin: top center;
+    opacity: 0;
+    animation: ssj2-spark-flash 0.35s ease-out forwards;
+    will-change: opacity, transform;
+}
+
+@keyframes ssj2-spark-flash {
+    0%   { opacity: 0; transform: scaleY(0.3); }
+    20%  { opacity: 1; transform: scaleY(1); }
+    60%  { opacity: 1; transform: scaleY(1); }
+    100% { opacity: 0; transform: scaleY(0.6); }
 }

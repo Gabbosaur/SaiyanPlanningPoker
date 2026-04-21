@@ -82,19 +82,28 @@
 
         /**
          * Applies the table glow based on the current consensus streak.
-         * No visible effect below 3. Beyond 6 caps at "streak-max".
+         * Progression:
+         *   streak 2 = aura visible (gold)
+         *   streak 3 = gold/orange
+         *   streak 4 = red
+         *   streak 5+ = max
+         * Also toggles the ambient SSJ2 sparks effect at streak >= 2.
          */
         function applyConsensusStreakGlow(streak) {
             const table = document.querySelector('.dbz-table');
             if (!table) return;
             // Strip previous streak classes
-            ['streak-3', 'streak-4', 'streak-5', 'streak-6', 'streak-max']
+            ['streak-2', 'streak-3', 'streak-4', 'streak-5', 'streak-max']
                 .forEach((c) => table.classList.remove(c));
-            if (streak >= 7) table.classList.add('streak-max');
-            else if (streak === 6) table.classList.add('streak-6');
-            else if (streak === 5) table.classList.add('streak-5');
+            if (streak >= 5) table.classList.add('streak-max');
             else if (streak === 4) table.classList.add('streak-4');
             else if (streak === 3) table.classList.add('streak-3');
+            else if (streak === 2) table.classList.add('streak-2');
+
+            // Ambient SSJ2 sparks from streak 2 onwards
+            if (window.SPP.animations.setSsj2Sparks) {
+                window.SPP.animations.setSsj2Sparks(streak >= 2);
+            }
         }
 
         socket.on('session-joined', (data) => {
@@ -226,8 +235,14 @@
             }
         });
 
+        // Track last known streak so we can suppress the default celebration
+        // overlay when the streak banner is already shown.
+        let lastKnownStreak = 0;
+
         socket.on('voting-complete', (data) => {
             const { votes, results, consensusStreak, allZero } = data;
+
+            lastKnownStreak = consensusStreak || 0;
 
             const currentSession = getCurrentSession();
             if (currentSession) {
@@ -257,6 +272,12 @@
 
             // Update table glow based on consensus streak (kicks in at 3+)
             applyConsensusStreakGlow(consensusStreak || 0);
+
+            // Celebratory banner from streak >= 2 (at streak 1 the default SSJ overlay plays)
+            if (consensusStreak && consensusStreak >= 2 && window.SPP.animations.showStreakBanner) {
+                const soundEnabled = deps.isSoundEnabled ? deps.isSoundEnabled() : false;
+                window.SPP.animations.showStreakBanner(consensusStreak, { soundEnabled });
+            }
 
             // All-zero easter egg
             if (allZero) {
@@ -336,6 +357,9 @@
         });
 
         socket.on('celebrate-consensus', () => {
+            // Only show the default SSJ overlay at streak 1; from streak 2 onwards
+            // the streak banner takes over (with SSJ2 sound + sparks).
+            if (lastKnownStreak >= 2) return;
             triggerCelebration();
         });
 

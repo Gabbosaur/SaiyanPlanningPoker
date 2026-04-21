@@ -133,6 +133,161 @@
     window.SPP.animations = {
         playUserLeaveAnimation,
         playUserJoinAnimation,
-        playResetAnimation
+        playResetAnimation,
+        showStreakBanner,
+        setSsj2Sparks
     };
+
+    // --- SSJ2 electric sparks (active while consensus streak >= 4) ---
+    let ssj2Interval = null;
+
+    /**
+     * Generates a short zigzag "lightning" element attached to the document.
+     * Two or three connected segments simulate the crooked shape.
+     */
+    function spawnSsj2Spark() {
+        const tableEl = document.querySelector('.dbz-table');
+        if (!tableEl) return;
+        const rect = tableEl.getBoundingClientRect();
+
+        // Spawn around the oval table: random angle, near the border (slightly inside/outside).
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const angle = Math.random() * Math.PI * 2;
+        const radiusX = rect.width / 2;
+        const radiusY = rect.height / 2;
+        const offset = 10 + Math.random() * 30; // spread from the border
+        const x = centerX + Math.cos(angle) * (radiusX + (Math.random() < 0.5 ? offset : -offset));
+        const y = centerY + Math.sin(angle) * (radiusY + (Math.random() < 0.5 ? offset : -offset));
+
+        // Build 2-3 connected segments for a crooked look
+        const segmentCount = 2 + Math.floor(Math.random() * 2);
+        let cx = x;
+        let cy = y;
+
+        for (let i = 0; i < segmentCount; i++) {
+            const length = 12 + Math.random() * 20;
+            const segAngle = (Math.random() * 90 - 45) * (Math.PI / 180); // -45° to +45° from vertical
+            const spark = document.createElement('div');
+            spark.className = 'ssj2-spark';
+            spark.style.left = `${cx}px`;
+            spark.style.top = `${cy}px`;
+            spark.style.height = `${length}px`;
+            spark.style.transform = `rotate(${segAngle}rad)`;
+            spark.style.animationDelay = `${i * 0.04}s`;
+            document.body.appendChild(spark);
+
+            // Advance the tip to the end of this segment for the next one
+            cx += Math.sin(segAngle) * length;
+            cy += Math.cos(segAngle) * length;
+
+            setTimeout(() => spark.remove(), 500 + i * 40);
+        }
+    }
+
+    function scheduleSsj2Spark() {
+        if (!ssj2Interval) return;
+        // Variable interval: 0.6 - 1.8s between bursts
+        const delay = 600 + Math.random() * 1200;
+        ssj2Interval = setTimeout(() => {
+            spawnSsj2Spark();
+            scheduleSsj2Spark();
+        }, delay);
+    }
+
+    /**
+     * Toggles the ambient SSJ2 sparks effect on or off.
+     * @param {boolean} enabled
+     */
+    function setSsj2Sparks(enabled) {
+        if (enabled && !ssj2Interval) {
+            // Non-zero truthy sentinel so scheduleSsj2Spark doesn't bail out
+            ssj2Interval = true;
+            scheduleSsj2Spark();
+        } else if (!enabled && ssj2Interval) {
+            clearTimeout(ssj2Interval);
+            ssj2Interval = null;
+            // Remove any remaining sparks instantly
+            document.querySelectorAll('.ssj2-spark').forEach((el) => el.remove());
+        }
+    }
+
+    /**
+     * Full-screen banner shown at consecutive consensus streak >= 2.
+     * Non-blocking (pointer-events: none), auto-removes after ~2s.
+     *
+     * @param {number} streak - current consensus streak
+     * @param {Object} [options]
+     * @param {boolean} [options.soundEnabled] - play a celebration sound
+     */
+    function showStreakBanner(streak, options = {}) {
+        if (!streak || streak < 2) return;
+
+        const { soundEnabled = false } = options;
+        const tier = streak >= 4 ? 'tier-hot' : streak >= 3 ? 'tier-warm' : '';
+
+        const banner = document.createElement('div');
+        banner.className = `streak-banner ${tier}`.trim();
+
+        const burst = document.createElement('div');
+        burst.className = 'streak-banner-burst';
+
+        const combo = document.createElement('div');
+        combo.className = 'streak-banner-combo';
+        combo.textContent = 'CONSENSUS COMBO';
+
+        const number = document.createElement('div');
+        number.className = 'streak-banner-number';
+        number.textContent = `x${streak}`;
+
+        const label = document.createElement('div');
+        label.className = 'streak-banner-label';
+        label.textContent = streak >= 7 ? 'ULTRA INSTINCT'
+            : streak >= 6 ? 'SSJ BLUE'
+            : streak >= 5 ? 'SSJ GOD'
+            : streak === 4 ? 'SSJ4 BURST'
+            : streak === 3 ? 'SSJ3 UNLEASHED'
+            : 'SSJ2 AWAKENED';
+
+        banner.appendChild(burst);
+        banner.appendChild(combo);
+        banner.appendChild(number);
+        banner.appendChild(label);
+        document.body.appendChild(banner);
+
+        // From streak 2 onwards play a SSJ-themed aura sound with a long gradual fade.
+        // Progression: SSJ2 -> SSJ3 -> SSJ Blue -> Ultra Instinct.
+        if (soundEnabled) {
+            let soundUrl;
+            if (streak >= 7) soundUrl = '/sounds/UltrainstinctGoku.mp3';
+            else if (streak >= 5) soundUrl = '/sounds/ssjb sound effect.mp3';
+            else if (streak >= 3) soundUrl = '/sounds/ssj3 sound effect.mp3';
+            else soundUrl = '/sounds/super-saiyan-2-aura.mp3';
+
+            const audio = new Audio(soundUrl);
+            audio.volume = 0.8;
+            audio.play().catch((e) => console.warn('Streak sound playback failed:', e));
+
+            const FADE_START_MS = 15000;
+            const FADE_DURATION_MS = 4000;
+            const FADE_STEPS = 40;
+
+            setTimeout(() => {
+                if (audio.paused) return;
+                const initialVolume = audio.volume;
+                const stepMs = FADE_DURATION_MS / FADE_STEPS;
+                let step = 0;
+                const interval = setInterval(() => {
+                    step++;
+                    audio.volume = Math.max(0, initialVolume * (1 - step / FADE_STEPS));
+                    if (step >= FADE_STEPS) {
+                        clearInterval(interval);
+                        audio.pause();
+                    }
+                }, stepMs);
+            }, FADE_START_MS);
+        }
+
+        setTimeout(() => banner.remove(), 2100);
+    }
 })();

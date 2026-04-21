@@ -32,7 +32,7 @@ function startBackgroundJobs(io) {
                     if (user.lastHeartbeat && Date.now() - user.lastHeartbeat > INACTIVE_TIMEOUT_MS) {
                         console.log(`User ${user.name} (${userId}) removed due to inactivity`);
 
-                        if (session.votes && session.votes[userId]) {
+                        if (session.votes && Object.hasOwn(session.votes, userId)) {
                             delete session.votes[userId];
                         }
                         delete session.users[userId];

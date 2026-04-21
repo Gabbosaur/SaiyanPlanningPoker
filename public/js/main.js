@@ -669,7 +669,8 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
             // Check if this user has voted and add the appropriate class
-            if (currentSession && currentSession.votes && currentSession.votes[id]) {
+            // Use hasOwnProperty so a vote of 0 (falsy) is still counted as voted
+            if (currentSession && currentSession.votes && Object.hasOwn(currentSession.votes, id)) {
                 participantEl.classList.add('user-has-voted');
                 const voteIndicator = participantEl.querySelector('.vote-indicator');
                 if (voteIndicator) {
@@ -928,21 +929,40 @@ document.addEventListener('DOMContentLoaded', () => {
             'text-2xl font-bold text-green-500' :
             'text-2xl font-bold text-red-500';
 
+        // Identify min/max numeric voters to highlight for discussion.
+        // Only when there's no consensus and we have differing numeric votes.
+        const numericEntries = Object.entries(votes)
+            .filter(([, v]) => v !== '?' && !Number.isNaN(Number(v)))
+            .map(([userId, v]) => ({ userId, value: Number(v), raw: v }));
+
+        const showHints = !results.consensus && numericEntries.length >= 2;
+        let minVoterIds = new Set();
+        let maxVoterIds = new Set();
+
+        if (showHints) {
+            const minVal = Math.min(...numericEntries.map((e) => e.value));
+            const maxVal = Math.max(...numericEntries.map((e) => e.value));
+            if (minVal !== maxVal) {
+                minVoterIds = new Set(numericEntries.filter((e) => e.value === minVal).map((e) => e.userId));
+                maxVoterIds = new Set(numericEntries.filter((e) => e.value === maxVal).map((e) => e.userId));
+            }
+        }
+
         // Show all votes with participant names
         Object.keys(votes).forEach(userId => {
             const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
-            if (participantEl) {
-                const voteIndicator = participantEl.querySelector('.vote-indicator');
-                if (voteIndicator) {
-                    voteIndicator.classList.remove('hidden');
-                    voteIndicator.querySelector('.dbz-vote-card').textContent = votes[userId];
+            if (!participantEl) return;
 
-                    // Add animation to reveal the vote
-                    voteIndicator.classList.add('reveal-vote');
-                    setTimeout(() => {
-                        voteIndicator.classList.remove('reveal-vote');
-                    }, 500);
-                }
+            const voteIndicator = participantEl.querySelector('.vote-indicator');
+            if (voteIndicator) {
+                voteIndicator.classList.remove('hidden');
+                voteIndicator.querySelector('.dbz-vote-card').textContent = votes[userId];
+
+                // Add animation to reveal the vote
+                voteIndicator.classList.add('reveal-vote');
+                setTimeout(() => {
+                    voteIndicator.classList.remove('reveal-vote');
+                }, 500);
             }
         });
 
@@ -950,14 +970,16 @@ document.addEventListener('DOMContentLoaded', () => {
         createVoteChart(votes);
         voteStatus.textContent = 'Voting complete!';
 
-        // Create detailed vote breakdown
-        createVoteBreakdown(votes);
+        // Create detailed vote breakdown with min/max info
+        createVoteBreakdown(votes, { minVoterIds, maxVoterIds });
 
         // Set flag that voting is complete
         hasVoted = true;
     }
 
-    function createVoteBreakdown(votes) {
+    function createVoteBreakdown(votes, hints = {}) {
+        const minVoterIds = hints.minVoterIds || new Set();
+        const maxVoterIds = hints.maxVoterIds || new Set();
         // Check if breakdown container already exists
         let breakdownContainer = document.getElementById('vote-breakdown');
 
@@ -998,8 +1020,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create static vote cards in single row
         sortedVotes.forEach(([userId, vote]) => {
             const participant = participants[userId];
+            const isMin = minVoterIds.has(userId);
+            const isMax = maxVoterIds.has(userId);
+
             const voteCard = document.createElement('div');
-            voteCard.className = 'flex-shrink-0 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700 p-2';
+            let cardClasses = 'relative flex-shrink-0 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700 p-2';
+            if (isMin) cardClasses += ' breakdown-hint-min';
+            if (isMax) cardClasses += ' breakdown-hint-max';
+            voteCard.className = cardClasses;
+
+            // Hint badge (LOW / HIGH) positioned above the card
+            if (isMin || isMax) {
+                const badge = document.createElement('div');
+                badge.className = `vote-hint-badge ${isMin ? 'vote-hint-badge-min' : 'vote-hint-badge-max'}`;
+                badge.textContent = isMin ? 'LOW' : 'HIGH';
+                voteCard.appendChild(badge);
+            }
 
             // Create a compact vertical layout for each vote
             const cardContent = document.createElement('div');
@@ -1196,6 +1232,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.user-has-voted').forEach(el => {
             el.classList.remove('user-has-voted');
         });
+
+        // Clear vote hint highlights + badges (min/max from previous round)
+        document.querySelectorAll('.vote-hint-badge').forEach(el => el.remove());
 
         voteStatus.textContent = 'Waiting for votes...';
         voteCounter.textContent = '0/0 votes';

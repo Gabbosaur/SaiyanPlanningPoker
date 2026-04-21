@@ -121,7 +121,7 @@ function handleJoinSession(io, socket, data) {
                 const existing = sessions[sessionId].users[existingSocketId];
                 if (existing && existing.persistentId === user.persistentId && existingSocketId !== socket.id) {
                     console.log(`Removing stale entry for ${user.persistentId} (old socket: ${existingSocketId})`);
-                    if (sessions[sessionId].votes && sessions[sessionId].votes[existingSocketId]) {
+                    if (sessions[sessionId].votes && Object.hasOwn(sessions[sessionId].votes, existingSocketId)) {
                         sessions[sessionId].votes[socket.id] = sessions[sessionId].votes[existingSocketId];
                         delete sessions[sessionId].votes[existingSocketId];
                     }
@@ -161,7 +161,7 @@ function handleDisconnect(io, socket) {
         if (session && session.users && session.users[socket.id]) {
             console.log(`Removing user ${session.users[socket.id].name} from session ${sessionId}`);
 
-            if (session.votes && session.votes[socket.id]) {
+            if (session.votes && Object.hasOwn(session.votes, socket.id)) {
                 delete session.votes[socket.id];
             }
             delete session.users[socket.id];
@@ -176,7 +176,7 @@ function handleLeaveSession(socket, sessionId) {
     console.log(`User ${socket.id} explicitly leaving session ${sessionId}`);
     if (sessions[sessionId] && sessions[sessionId].users[socket.id]) {
         delete sessions[sessionId].users[socket.id];
-        if (sessions[sessionId].votes[socket.id]) {
+        if (Object.hasOwn(sessions[sessionId].votes, socket.id)) {
             delete sessions[sessionId].votes[socket.id];
         }
         socket.to(sessionId).emit('user-left', socket.id);
@@ -229,8 +229,9 @@ function handleSubmitVote(io, socket, data) {
 
         const connectedPlayers = Object.values(session.users)
             .filter((u) => u.isConnected && !u.isSpectator);
+        // Use hasOwnProperty so a vote of 0 (falsy) is still counted as voted
         const allPlayersVoted = connectedPlayers.length > 0
-            && connectedPlayers.every((u) => session.votes[u.id]);
+            && connectedPlayers.every((u) => Object.hasOwn(session.votes, u.id));
 
         if (allPlayersVoted) {
             const playerVoteValues = Object.entries(session.votes)
@@ -410,7 +411,7 @@ function handleToggleSpectator(io, socket, data) {
 
         session.users[socket.id].isSpectator = isSpectator;
 
-        if (isSpectator && session.votes[socket.id]) {
+        if (isSpectator && Object.hasOwn(session.votes, socket.id)) {
             delete session.votes[socket.id];
         }
 
