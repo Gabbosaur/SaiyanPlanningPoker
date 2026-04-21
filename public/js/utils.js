@@ -114,6 +114,22 @@
         }, stepDuration);
     }
 
+    /**
+     * Shows a toast-style notification in the top-right corner.
+     * @param {string} message
+     * @param {'info'|'success'|'error'} [type]
+     */
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        const bgClass = type === 'success' ? 'bg-green-500'
+            : type === 'error' ? 'bg-red-500'
+            : 'bg-blue-500';
+        notification.className = `fixed top-1 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${bgClass} text-white`;
+        notification.textContent = sanitizeInput(message);
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 1500);
+    }
+
     window.SPP = window.SPP || {};
     window.SPP.utils = {
         sanitizeInput,
@@ -123,6 +139,7 @@
         createSafeElement,
         getPersistentUserId,
         generateSessionId,
-        fadeOutAudio
+        fadeOutAudio,
+        showNotification
     };
 })();

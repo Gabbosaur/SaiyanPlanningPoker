@@ -1,52 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Input sanitization utility
-    function sanitizeInput(input) {
-        if (typeof input !== 'string') return '';
-        return input.replace(/[<>"'&]/g, function(match) {
-            const map = {
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#x27;',
-                '&': '&amp;'
-            };
-            return map[match];
-        });
-    }
-
-    // CSRF token generation and validation
-    let csrfToken = null;
-    function generateCSRFToken() {
-        const array = new Uint8Array(32);
-        crypto.getRandomValues(array);
-        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-    }
-
-    function getCSRFToken() {
-        if (!csrfToken) {
-            csrfToken = generateCSRFToken();
-            sessionStorage.setItem('csrfToken', csrfToken);
-        }
-        return csrfToken;
-    }
-
-    // Initialize CSRF token
-    csrfToken = sessionStorage.getItem('csrfToken') || generateCSRFToken();
-    sessionStorage.setItem('csrfToken', csrfToken);
-
-    // Safe DOM content setter
-    function setSafeContent(element, content) {
-        if (!element) return;
-        element.textContent = content; // Always use textContent to prevent XSS
-    }
-
-    // Safe HTML creation with sanitization
-    function createSafeElement(tag, textContent = '', className = '') {
-        const element = document.createElement(tag);
-        if (textContent) element.textContent = sanitizeInput(textContent);
-        if (className) element.className = className;
-        return element;
-    }
+    // Utility functions extracted to utils.js
+    const {
+        sanitizeInput,
+        getCSRFToken,
+        setSafeContent,
+        getPersistentUserId,
+        generateSessionId,
+        showNotification
+    } = window.SPP.utils;
 
     // DOM Elements
     const loginScreen = document.getElementById('login-screen');
@@ -83,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const collisionContainer = document.getElementById('collision-container');
     const emojiPanel = document.getElementById('emoji-panel');
     const emojiContainer = document.getElementById('emoji-container');
-    const miniGameModal = document.getElementById('mini-game-modal');
     const punchSound = document.getElementById('punch-sound');
     
     // Punch sounds managed by avatar-effects.js module
@@ -95,23 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // App State
     let sessionId = '';
-
-    // Persistent user ID across standby/reload to prevent ghost duplicates on rejoin
-    // and prevent vote abuse (multiple tabs from the same browser = same identity).
-    // Uses localStorage so all tabs in the same browser share the same user ID.
-    function getPersistentUserId() {
-        try {
-            let pid = localStorage.getItem('spp-persistent-user-id');
-            if (!pid) {
-                pid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 11);
-                localStorage.setItem('spp-persistent-user-id', pid);
-            }
-            return pid;
-        } catch (e) {
-            // localStorage unavailable, fallback to session-only id
-            return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 11);
-        }
-    }
 
     let user = {
         id: '',
@@ -292,10 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     celebrationSound.load();
     punchSound.load();
 
-    // Generate a random session ID
-    function generateSessionId() {
-        return Math.random().toString(36).substring(2, 9).toUpperCase();
-    }
+    // generateSessionId extracted to utils.js
 
     // Handle page unload
     window.addEventListener('beforeunload', () => {
@@ -580,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update the vote-updated event handler
         socket.on('vote-updated', (data) => {
-            const { userId, vote, voterName } = data;
+            const { userId, vote } = data;
 
             // Update current session state
             if (currentSession) {
@@ -1059,23 +999,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function showVoteNotification(voterName) {
-        // Create a subtle notification
-        const notification = document.createElement('div');
-        notification.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg shadow-lg z-40 transition-all duration-300';
-        notification.textContent = `${voterName} has voted`;
-
-        document.body.appendChild(notification);
-
-        // Remove after 2 seconds
-        setTimeout(() => {
-            notification.style.opacity = '0';
-            notification.style.transform = 'translate(-50%, 10px)';
-            setTimeout(() => {
-                notification.remove();
-            }, 300);
-        }, 2000);
-    }
+    // showVoteNotification (unused) removed during cleanup
 
     // Enhanced function to animate collision between users (local)
     // Extracted to avatar-effects.js
@@ -1128,39 +1052,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    function reconnectToSession() {
-        if (isReconnecting) return;
-
-        isReconnecting = true;
-
-        // Show a loading indicator
-        const reconnectBtn = document.getElementById('reconnect-btn');
-        if (reconnectBtn) {
-            reconnectBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Connecting...';
-            reconnectBtn.disabled = true;
-        }
-
-        // Create a new socket connection
-        socket = io();
-
-        // Set up socket listeners again
-        setupSocketListeners();
-
-        // Join the session again
-        socket.emit('join-session', {
-            sessionId,
-            user,
-            csrfToken: getCSRFToken()
-        });
-
-        // Start heartbeat again
-        startHeartbeat();
-
-        // Reset reconnection flag after a delay
-        setTimeout(() => {
-            isReconnecting = false;
-        }, 5000);
-    }
+    // reconnectToSession (unused - reconnection handled by socket.io auto-reconnect) removed during cleanup
 
     function updateConnectionStatus(status) {
         const indicator = document.getElementById('status-indicator');
@@ -1444,20 +1336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         breakdownContainer.appendChild(summaryStats);
     }
 
-    // Helper function to show notifications
-    function showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `fixed top-1 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500' :
-            type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-            } text-white`;
-        setSafeContent(notification, sanitizeInput(message));
-        document.body.appendChild(notification);
-
-        // Remove notification after 1.5 seconds
-        setTimeout(() => {
-            notification.remove();
-        }, 1500);
-    }
+    // Helper function to show notifications - extracted to utils.js (imported at top)
 
     // New function to create the vote chart
     function createVoteChart(votes) {
@@ -1750,8 +1629,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', checkScreenSize);
 
     // Music Player extracted to music-player.js (window.SPP.musicPlayer)
-    // fadeOutAudio extracted to utils.js (window.SPP.utils.fadeOutAudio)
-    const fadeOutAudio = window.SPP.utils.fadeOutAudio;
+    // fadeOutAudio imported at top via utils destructuring
     const musicPlayer = window.SPP.musicPlayer;
 
     // Initialize the music player
