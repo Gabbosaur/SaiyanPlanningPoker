@@ -135,39 +135,38 @@
         playUserJoinAnimation,
         playResetAnimation,
         showStreakBanner,
-        setSsj2Sparks
+        setStreakAmbientEffect
     };
 
-    // --- SSJ2 electric sparks (active while consensus streak >= 4) ---
-    let ssj2Interval = null;
+    // --- Streak ambient effects (active while consensus streak >= 2) ---
+    // streak 2-4 -> SSJ2 blue electric sparks
+    // streak 5   -> SSJ God red ki particles
+    // streak 6   -> SSJ Blue cyan ki particles
+    // streak 7+  -> Ultra Instinct white/silver ki particles
+    let ambientInterval = null;
+    let ambientMode = null; // 'ssj2' | 'god' | 'blue' | 'ui' | null
 
-    /**
-     * Generates a short zigzag "lightning" element attached to the document.
-     * Two or three connected segments simulate the crooked shape.
-     */
     function spawnSsj2Spark() {
         const tableEl = document.querySelector('.dbz-table');
         if (!tableEl) return;
         const rect = tableEl.getBoundingClientRect();
 
-        // Spawn around the oval table: random angle, near the border (slightly inside/outside).
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         const angle = Math.random() * Math.PI * 2;
         const radiusX = rect.width / 2;
         const radiusY = rect.height / 2;
-        const offset = 10 + Math.random() * 30; // spread from the border
+        const offset = 10 + Math.random() * 30;
         const x = centerX + Math.cos(angle) * (radiusX + (Math.random() < 0.5 ? offset : -offset));
         const y = centerY + Math.sin(angle) * (radiusY + (Math.random() < 0.5 ? offset : -offset));
 
-        // Build 2-3 connected segments for a crooked look
         const segmentCount = 2 + Math.floor(Math.random() * 2);
         let cx = x;
         let cy = y;
 
         for (let i = 0; i < segmentCount; i++) {
             const length = 12 + Math.random() * 20;
-            const segAngle = (Math.random() * 90 - 45) * (Math.PI / 180); // -45° to +45° from vertical
+            const segAngle = (Math.random() * 90 - 45) * (Math.PI / 180);
             const spark = document.createElement('div');
             spark.className = 'ssj2-spark';
             spark.style.left = `${cx}px`;
@@ -177,7 +176,6 @@
             spark.style.animationDelay = `${i * 0.04}s`;
             document.body.appendChild(spark);
 
-            // Advance the tip to the end of this segment for the next one
             cx += Math.sin(segAngle) * length;
             cy += Math.cos(segAngle) * length;
 
@@ -185,31 +183,79 @@
         }
     }
 
-    function scheduleSsj2Spark() {
-        if (!ssj2Interval) return;
-        // Variable interval: 0.6 - 1.8s between bursts
-        const delay = 600 + Math.random() * 1200;
-        ssj2Interval = setTimeout(() => {
+    /**
+     * Spawn a few divine ki particles rising upward from around the table.
+     * @param {'god'|'blue'|'ui'} color
+     */
+    function spawnAuraParticles(color) {
+        const tableEl = document.querySelector('.dbz-table');
+        if (!tableEl) return;
+        const rect = tableEl.getBoundingClientRect();
+
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const radiusX = rect.width / 2;
+        const radiusY = rect.height / 2;
+
+        const batch = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < batch; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            // Stay close to the table border
+            const x = centerX + Math.cos(angle) * (radiusX * (0.85 + Math.random() * 0.25));
+            const y = centerY + Math.sin(angle) * (radiusY * (0.85 + Math.random() * 0.25));
+
+            const particle = document.createElement('div');
+            particle.className = `aura-particle ${color}`;
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            // Small random variation for organic feel
+            const size = 4 + Math.random() * 6;
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
+            particle.style.animationDelay = `${Math.random() * 0.3}s`;
+            document.body.appendChild(particle);
+
+            setTimeout(() => particle.remove(), 3200);
+        }
+    }
+
+    function scheduleAmbientTick() {
+        if (!ambientMode) return;
+
+        let delay;
+        if (ambientMode === 'ssj2') {
             spawnSsj2Spark();
-            scheduleSsj2Spark();
-        }, delay);
+            delay = 600 + Math.random() * 1200;
+        } else {
+            // 'god' | 'blue' - steadier rhythm for drifting particles
+            spawnAuraParticles(ambientMode);
+            delay = 450 + Math.random() * 500;
+        }
+
+        ambientInterval = setTimeout(scheduleAmbientTick, delay);
     }
 
     /**
-     * Toggles the ambient SSJ2 sparks effect on or off.
-     * @param {boolean} enabled
+     * Toggles the ambient streak effect based on current tier.
+     * Pass null / 0 to disable.
+     * @param {'ssj2'|'god'|'blue'|'ui'|null} mode
      */
-    function setSsj2Sparks(enabled) {
-        if (enabled && !ssj2Interval) {
-            // Non-zero truthy sentinel so scheduleSsj2Spark doesn't bail out
-            ssj2Interval = true;
-            scheduleSsj2Spark();
-        } else if (!enabled && ssj2Interval) {
-            clearTimeout(ssj2Interval);
-            ssj2Interval = null;
-            // Remove any remaining sparks instantly
-            document.querySelectorAll('.ssj2-spark').forEach((el) => el.remove());
+    function setStreakAmbientEffect(mode) {
+        // Clear any pending tick
+        if (ambientInterval) {
+            clearTimeout(ambientInterval);
+            ambientInterval = null;
         }
+
+        ambientMode = mode || null;
+
+        if (!ambientMode) {
+            // Remove any lingering elements
+            document.querySelectorAll('.ssj2-spark, .aura-particle').forEach((el) => el.remove());
+            return;
+        }
+
+        scheduleAmbientTick();
     }
 
     /**

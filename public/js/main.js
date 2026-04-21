@@ -1387,6 +1387,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize the music player
     musicPlayer.init();
 
+    // Initialize hidden easter eggs (kamehameha, ...)
+    if (window.SPP.easterEggs && window.SPP.easterEggs.init) {
+        window.SPP.easterEggs.init({
+            getSocket: () => socket,
+            getSessionId: () => sessionId
+        });
+    }
+
     // Card animation system
     function createFloatingCard() {
         const isHalloween = document.body.classList.contains('halloween-theme');

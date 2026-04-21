@@ -34,6 +34,7 @@ function registerSocketHandlers(io) {
         socket.on('send-emoji', (data) => handleSendEmoji(io, socket, data));
         socket.on('update-avatar', (data) => handleUpdateAvatar(io, socket, data));
         socket.on('super-saiyan', (data) => handleSuperSaiyan(io, data));
+        socket.on('kamehameha', (data) => handleKamehameha(io, socket, data));
         socket.on('user-collision', (data) => handleUserCollision(io, data));
         socket.on('toggle-spectator', (data) => handleToggleSpectator(io, socket, data));
     });
@@ -380,6 +381,38 @@ function handleSuperSaiyan(io, data) {
     const { sessionId, userId } = data;
     console.log(`Super Saiyan activated by user ${userId} in session ${sessionId}`);
     io.to(sessionId).emit('super-saiyan-mode', { userId });
+}
+
+// Rate limiter for kamehameha so a single client can't spam everyone.
+// Stages 1-3 have a short throttle; stage 4 (fire) has a longer cooldown.
+const kamehamehaFireCooldowns = new Map();
+const kamehamehaStageThrottles = new Map();
+const KAMEHAMEHA_FIRE_COOLDOWN_MS = 3500;
+const KAMEHAMEHA_STAGE_THROTTLE_MS = 250;
+
+function handleKamehameha(io, socket, data) {
+    const { sessionId, stage } = data || {};
+    if (!sessionId || !sessions[sessionId] || !sessions[sessionId].users[socket.id]) return;
+
+    const stageNum = Number(stage) || 4;
+    if (stageNum < 1 || stageNum > 4) return;
+
+    const now = Date.now();
+    if (stageNum === 4) {
+        const last = kamehamehaFireCooldowns.get(socket.id) || 0;
+        if (now - last < KAMEHAMEHA_FIRE_COOLDOWN_MS) return;
+        kamehamehaFireCooldowns.set(socket.id, now);
+    } else {
+        const last = kamehamehaStageThrottles.get(socket.id) || 0;
+        if (now - last < KAMEHAMEHA_STAGE_THROTTLE_MS) return;
+        kamehamehaStageThrottles.set(socket.id, now);
+    }
+
+    const fromName = sanitizeInput(sessions[sessionId].users[socket.id].name || 'Someone');
+    if (stageNum === 4) {
+        console.log(`Kamehameha fired by ${fromName} in session ${sessionId}`);
+    }
+    io.to(sessionId).emit('kamehameha-fired', { stage: stageNum, fromName });
 }
 
 function handleUserCollision(io, data) {

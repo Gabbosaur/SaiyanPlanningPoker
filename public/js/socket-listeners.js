@@ -81,13 +81,13 @@
             : 'T-shirt Sizes';
 
         /**
-         * Applies the table glow based on the current consensus streak.
+         * Applies the table glow + ambient effects based on the current consensus streak.
          * Progression:
-         *   streak 2 = aura visible (gold)
-         *   streak 3 = gold/orange
-         *   streak 4 = red
-         *   streak 5+ = max
-         * Also toggles the ambient SSJ2 sparks effect at streak >= 2.
+         *   streak 2       = aura visible (gold) + SSJ2 sparks
+         *   streak 3       = gold/orange + SSJ2 sparks
+         *   streak 4       = red + SSJ2 sparks
+         *   streak 5       = max glow + SSJ God red ki particles
+         *   streak 6+      = max glow + SSJ Blue ki particles
          */
         function applyConsensusStreakGlow(streak) {
             const table = document.querySelector('.dbz-table');
@@ -100,9 +100,14 @@
             else if (streak === 3) table.classList.add('streak-3');
             else if (streak === 2) table.classList.add('streak-2');
 
-            // Ambient SSJ2 sparks from streak 2 onwards
-            if (window.SPP.animations.setSsj2Sparks) {
-                window.SPP.animations.setSsj2Sparks(streak >= 2);
+            // Ambient effect: sparks for 2-4, god particles at 5, blue at 6, UI at 7+
+            if (window.SPP.animations.setStreakAmbientEffect) {
+                let mode = null;
+                if (streak >= 7) mode = 'ui';
+                else if (streak === 6) mode = 'blue';
+                else if (streak === 5) mode = 'god';
+                else if (streak >= 2) mode = 'ssj2';
+                window.SPP.animations.setStreakAmbientEffect(mode);
             }
         }
 
@@ -371,6 +376,15 @@
         socket.on('super-saiyan-mode', (data) => {
             const { userId } = data;
             triggerSuperSaiyan(userId);
+        });
+
+        socket.on('kamehameha-fired', (data) => {
+            if (window.SPP.easterEggs && window.SPP.easterEggs.playKamehamehaStage) {
+                window.SPP.easterEggs.playKamehamehaStage({
+                    stage: (data && data.stage) || 4,
+                    fromName: data && data.fromName
+                });
+            }
         });
 
         socket.on('connect_error', (error) => {

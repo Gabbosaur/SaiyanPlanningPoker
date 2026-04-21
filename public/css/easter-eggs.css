@@ -1,0 +1,210 @@
+/* Kamehameha easter egg: massive horizontal ki wave crossing the screen. */
+.kamehameha-wave {
+    position: fixed;
+    top: 50%;
+    left: -40%;
+    width: 60%;
+    height: 45vh;
+    min-height: 280px;
+    max-height: 520px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 9999;
+    border-radius: 50% / 40%;
+    background: radial-gradient(ellipse at 88% 50%,
+        rgba(255, 255, 255, 1) 0%,
+        rgba(220, 240, 255, 0.98) 12%,
+        rgba(147, 197, 253, 0.92) 32%,
+        rgba(59, 130, 246, 0.78) 55%,
+        rgba(29, 78, 216, 0.45) 80%,
+        transparent 100%);
+    filter:
+        blur(3px)
+        drop-shadow(0 0 60px rgba(147, 197, 253, 1))
+        drop-shadow(0 0 120px rgba(59, 130, 246, 0.85))
+        drop-shadow(0 0 200px rgba(29, 78, 216, 0.5));
+    animation: kamehameha-travel 1.6s cubic-bezier(0.45, 0, 0.3, 1) forwards;
+    will-change: transform, opacity, left, width;
+    opacity: 0;
+}
+
+@keyframes kamehameha-travel {
+    0% {
+        left: -50%;
+        opacity: 0;
+        width: 15%;
+    }
+    10% {
+        opacity: 1;
+        width: 35%;
+    }
+    50% {
+        width: 70%;
+        opacity: 1;
+    }
+    85% {
+        width: 85%;
+        opacity: 0.95;
+    }
+    100% {
+        left: 150%;
+        opacity: 0;
+        width: 95%;
+    }
+}
+
+/* Blindingly bright core along the center line */
+.kamehameha-wave::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 22px;
+    margin-top: -11px;
+    background: linear-gradient(to right,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 1) 45%,
+        rgba(219, 234, 254, 1) 75%,
+        rgba(147, 197, 253, 0.7) 100%);
+    filter: blur(2px);
+    box-shadow:
+        0 0 30px rgba(255, 255, 255, 1),
+        0 0 80px rgba(147, 197, 253, 0.9);
+}
+
+/* Dense trailing streaks of ki */
+.kamehameha-wave::after {
+    content: '';
+    position: absolute;
+    top: 25%;
+    left: 0;
+    right: 0;
+    bottom: 25%;
+    background:
+        repeating-linear-gradient(to right,
+            transparent 0,
+            transparent 30px,
+            rgba(255, 255, 255, 0.25) 30px,
+            rgba(255, 255, 255, 0.25) 35px);
+    mix-blend-mode: screen;
+    opacity: 0.6;
+}
+
+/* Charging orb (flash before the blast) - progressive sizes for each typed stage.
+   Positioned so the center stays anchored to the left side regardless of size. */
+.kamehameha-charge {
+    position: fixed;
+    top: 50%;
+    left: 8%;
+    width: 320px;
+    height: 320px;
+    margin: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+        rgba(255, 255, 255, 1) 0%,
+        rgba(219, 234, 254, 0.95) 25%,
+        rgba(147, 197, 253, 0.8) 50%,
+        rgba(37, 99, 235, 0.4) 75%,
+        transparent 100%);
+    filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9999;
+    animation: kamehameha-charge 0.7s ease-out forwards;
+    will-change: transform, opacity;
+    /* Anchor the center to (left 8%, top 50%) so all sizes pulse from the same spot */
+    transform: translate(-50%, -50%) scale(0);
+    transform-origin: center center;
+}
+
+/* Stage 1: "kame" — small, subtle */
+.kamehameha-charge.charge-stage-1 {
+    width: 120px;
+    height: 120px;
+    filter: blur(2px);
+    animation: charge-stage-grow 1.2s ease-out forwards;
+    --charge-peak-scale: 0.85;
+}
+
+/* Stage 2: "kameha" — medium */
+.kamehameha-charge.charge-stage-2 {
+    width: 200px;
+    height: 200px;
+    filter: blur(3px);
+    animation: charge-stage-grow 1.2s ease-out forwards;
+    --charge-peak-scale: 1;
+}
+
+/* Stage 3: "kamehame" — large, intense */
+.kamehameha-charge.charge-stage-3 {
+    width: 280px;
+    height: 280px;
+    filter: blur(3.5px)
+        drop-shadow(0 0 40px rgba(147, 197, 253, 0.85));
+    animation: charge-stage-grow 1.2s ease-out forwards;
+    --charge-peak-scale: 1.05;
+}
+
+/* Stage 4: "kamehameha" — final burst before the wave */
+.kamehameha-charge.charge-stage-4 {
+    filter: blur(4px)
+        drop-shadow(0 0 60px rgba(147, 197, 253, 1))
+        drop-shadow(0 0 120px rgba(37, 99, 235, 0.8));
+    animation: kamehameha-charge 0.7s ease-out forwards;
+}
+
+@keyframes kamehameha-charge {
+    0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    35%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+/* Progressive charge: grows, holds, then fades if no next stage happens */
+@keyframes charge-stage-grow {
+    0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    25%  { transform: translate(-50%, -50%) scale(var(--charge-peak-scale, 1)); opacity: 0.95; }
+    60%  { transform: translate(-50%, -50%) scale(var(--charge-peak-scale, 1)); opacity: 0.8; }
+    100% { transform: translate(-50%, -50%) scale(calc(var(--charge-peak-scale, 1) * 0.85)); opacity: 0; }
+}
+
+/* Label announcing the caster */
+.kamehameha-label {
+    position: fixed;
+    top: 18%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(1.5rem, 5vw, 3rem);
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 2px;
+    text-shadow:
+        0 0 14px rgba(147, 197, 253, 1),
+        0 0 28px rgba(37, 99, 235, 0.9),
+        0 4px 10px rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    pointer-events: none;
+    animation: kamehameha-label 2.1s ease-out forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes kamehameha-label {
+    0%   { transform: translate(-50%, -20px) scale(0.6); opacity: 0; }
+    12%  { transform: translate(-50%, 0) scale(1.1); opacity: 1; }
+    20%  { transform: translate(-50%, 0) scale(1); opacity: 1; }
+    80%  { opacity: 1; }
+    100% { transform: translate(-50%, -20px) scale(1); opacity: 0; }
+}
+
+/* Full-body screen shake while the blast travels */
+.kamehameha-shake {
+    animation: kamehameha-shake-anim 0.12s ease-in-out 7;
+}
+
+@keyframes kamehameha-shake-anim {
+    0%, 100% { transform: translate(0, 0); }
+    25%      { transform: translate(-4px, 2px); }
+    50%      { transform: translate(3px, -3px); }
+    75%      { transform: translate(-2px, -2px); }
+}
