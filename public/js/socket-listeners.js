@@ -142,6 +142,7 @@
         socket.on('user-removed', (userId) => {
             const participants = getParticipants();
             if (participants[userId]) {
+                const soundEnabled = deps.isSoundEnabled ? deps.isSoundEnabled() : false;
                 playUserLeaveAnimation(userId, () => {
                     delete participants[userId];
                     const currentSession = getCurrentSession();
@@ -153,7 +154,7 @@
                     }
                     renderParticipants();
                     updateVoteStatus();
-                });
+                }, { soundEnabled });
             }
         });
 

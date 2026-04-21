@@ -7,12 +7,31 @@
     const JOIN_ANIMATION_DURATION = 1000;
     const RESET_ANIMATION_DURATION = 800;
 
+    const LEAVE_SOUND_URL = '/sounds/dbz-teleport-logoff.mp3';
+    const JOIN_SOUND_URL = '/sounds/landing-join.mp3';
+
+    function playSound(url, volume = 0.5) {
+        try {
+            const audio = new Audio(url);
+            audio.volume = volume;
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch((error) => {
+                    console.warn(`Sound playback failed for ${url}:`, error);
+                });
+            }
+        } catch (error) {
+            console.warn(`Error creating audio for ${url}:`, error);
+        }
+    }
+
     /**
      * Dematerialization effect (Instant Transmission style).
      * Clones the participant element and animates the clone so the effect
      * is not interrupted by any re-render of the participants list.
      */
-    function playUserLeaveAnimation(userId, onComplete) {
+    function playUserLeaveAnimation(userId, onComplete, options = {}) {
+        const { soundEnabled = false } = options;
         const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
 
         if (!participantEl) {
@@ -40,6 +59,8 @@
 
         document.body.appendChild(ghost);
 
+        if (soundEnabled) playSound(LEAVE_SOUND_URL, 0.5);
+
         // Let caller proceed immediately (the animation runs on the ghost)
         if (onComplete) onComplete();
 
@@ -51,8 +72,9 @@
     /**
      * Fly-in from above with bounce and impact ring.
      */
-    function playUserJoinAnimation(participantEl) {
+    function playUserJoinAnimation(participantEl, options = {}) {
         if (!participantEl) return;
+        const { soundEnabled = false } = options;
 
         const trail = document.createElement('div');
         trail.className = 'user-join-trail';
@@ -66,6 +88,8 @@
         void participantEl.offsetWidth;
 
         participantEl.classList.add('user-joining');
+
+        if (soundEnabled) playSound(JOIN_SOUND_URL, 0.5);
 
         setTimeout(() => {
             if (!participantEl.isConnected) return;
@@ -99,18 +123,7 @@
         document.body.appendChild(overlay);
 
         if (soundEnabled) {
-            try {
-                const audio = new Audio(soundUrl);
-                audio.volume = volume;
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch((error) => {
-                        console.warn('Reset sound playback failed:', error);
-                    });
-                }
-            } catch (error) {
-                console.warn('Error playing reset sound:', error);
-            }
+            playSound(soundUrl, volume);
         }
 
         setTimeout(() => overlay.remove(), RESET_ANIMATION_DURATION);

@@ -611,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Play fly-in animation for newly joined users (once)
             if (newlyJoinedIds.has(id)) {
                 newlyJoinedIds.delete(id);
-                playUserJoinAnimation(participantEl);
+                playUserJoinAnimation(participantEl, { soundEnabled });
             }
         });
 
