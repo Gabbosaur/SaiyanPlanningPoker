@@ -8,6 +8,9 @@ pnpm-lock.yaml
 yarn.lock
 
 # Custom
+# User-uploaded avatars should not be committed to the repo
+public/uploads/*
+!public/uploads/.gitkeep
 uploads/
 
 # Build output
