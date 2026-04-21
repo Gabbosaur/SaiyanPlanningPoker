@@ -324,8 +324,9 @@ function calculateResults(votes) {
     };
 }
 
-// Heartbeat mechanism to detect disconnected users
-// More lenient heartbeat mechanism
+// Heartbeat mechanism to detect inactive users and remove them
+const INACTIVE_TIMEOUT_MS = 1800000; // 30 minutes of no heartbeat = inactive -> removed
+
 let heartbeatInterval = setInterval(() => {
     try {
         Object.keys(sessions).forEach(sessionId => {
@@ -336,19 +337,38 @@ let heartbeatInterval = setInterval(() => {
                 const user = session.users[userId];
                 if (!user) return;
 
-                // Only mark as disconnected if no heartbeat for 30 minutes
-                if (user.isConnected && user.lastHeartbeat &&
-                    Date.now() - user.lastHeartbeat > 1800000) { // 30 minutes in milliseconds
-                    console.log(`User ${user.name} (${userId}) timed out after 30 minutes`);
-                    user.isConnected = false;
-                    io.to(sessionId).emit('user-disconnected', userId);
+                // Remove user if no heartbeat for INACTIVE_TIMEOUT_MS
+                if (user.lastHeartbeat &&
+                    Date.now() - user.lastHeartbeat > INACTIVE_TIMEOUT_MS) {
+                    console.log(`User ${user.name} (${userId}) removed due to inactivity`);
+
+                    // Remove any vote from this user
+                    if (session.votes && session.votes[userId]) {
+                        delete session.votes[userId];
+                    }
+
+                    // Remove user from session
+                    delete session.users[userId];
+
+                    // Notify all clients in the session
+                    io.to(sessionId).emit('user-removed', userId);
+
+                    // Update vote count for remaining players
+                    const connectedPlayers = Object.values(session.users).filter(u => u.isConnected && !u.isSpectator);
+                    const playerVotes = Object.keys(session.votes).filter(uid =>
+                        session.users[uid] && !session.users[uid].isSpectator
+                    );
+                    io.to(sessionId).emit('vote-count-updated', {
+                        current: playerVotes.length,
+                        total: connectedPlayers.length
+                    });
                 }
             });
         });
     } catch (error) {
         console.error('Error in heartbeat mechanism:', error);
     }
-}, 60000); // Check every minute instead of every 10 seconds
+}, 30000); // Check every 30 seconds
 
 // Session cleanup - remove inactive sessions after 24 hours
 let sessionCleanupInterval = setInterval(() => {
@@ -417,6 +437,13 @@ io.on('connection', (socket) => {
                 return;
             }
 
+            // Validate persistent ID (optional but recommended for rejoin dedup)
+            if (user.persistentId) {
+                if (typeof user.persistentId !== 'string' || user.persistentId.length > 100 || !/^[a-zA-Z0-9_-]+$/.test(user.persistentId)) {
+                    user.persistentId = null;
+                }
+            }
+
             // Sanitize and validate user input
             user.name = sanitizeInput(user.name);
             if (!user.name || user.name.length < 1 || user.name.length > 50) {
@@ -450,6 +477,25 @@ io.on('connection', (socket) => {
             // Update session activity
             sessions[sessionId].lastActivity = Date.now();
 
+            // Remove any existing entries for this persistent user (prevents ghost duplicates on rejoin)
+            if (user.persistentId) {
+                Object.keys(sessions[sessionId].users).forEach(existingSocketId => {
+                    const existing = sessions[sessionId].users[existingSocketId];
+                    if (existing && existing.persistentId === user.persistentId && existingSocketId !== socket.id) {
+                        console.log(`Removing stale entry for persistent user ${user.persistentId} (old socket: ${existingSocketId})`);
+
+                        // Transfer vote from old socket to new one
+                        if (sessions[sessionId].votes && sessions[sessionId].votes[existingSocketId]) {
+                            sessions[sessionId].votes[socket.id] = sessions[sessionId].votes[existingSocketId];
+                            delete sessions[sessionId].votes[existingSocketId];
+                        }
+
+                        delete sessions[sessionId].users[existingSocketId];
+                        io.to(sessionId).emit('user-removed', existingSocketId);
+                    }
+                });
+            }
+
             // Add user to session
             sessions[sessionId].users[socket.id] = {
                 ...user,
@@ -482,12 +528,32 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
 
-        // Find and update user in all sessions
+        // Find and remove user from all sessions
         Object.keys(sessions).forEach(sessionId => {
-            if (sessions[sessionId].users[socket.id]) {
-                console.log(`Marking user ${sessions[sessionId].users[socket.id].name} as disconnected`);
-                sessions[sessionId].users[socket.id].isConnected = false;
-                io.to(sessionId).emit('user-disconnected', socket.id);
+            const session = sessions[sessionId];
+            if (session && session.users && session.users[socket.id]) {
+                console.log(`Removing user ${session.users[socket.id].name} from session ${sessionId}`);
+
+                // Remove any vote from this user
+                if (session.votes && session.votes[socket.id]) {
+                    delete session.votes[socket.id];
+                }
+
+                // Remove user from session
+                delete session.users[socket.id];
+
+                // Notify other clients
+                io.to(sessionId).emit('user-removed', socket.id);
+
+                // Update vote count
+                const connectedPlayers = Object.values(session.users).filter(u => u.isConnected && !u.isSpectator);
+                const playerVotes = Object.keys(session.votes).filter(uid =>
+                    session.users[uid] && !session.users[uid].isSpectator
+                );
+                io.to(sessionId).emit('vote-count-updated', {
+                    current: playerVotes.length,
+                    total: connectedPlayers.length
+                });
             }
         });
     });

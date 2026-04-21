@@ -2189,3 +2189,264 @@ audio {
         height: 1.75rem;
     }
 }
+
+
+/* Reset Turn Animation - Subtle Flash */
+.reset-wave-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+    contain: strict;
+}
+
+.reset-flash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center,
+        rgba(249, 215, 28, 0.18) 0%,
+        rgba(255, 149, 0, 0.08) 35%,
+        transparent 65%);
+    opacity: 0;
+    will-change: opacity;
+    animation: reset-flash-fade 0.6s ease-out forwards;
+}
+
+@keyframes reset-flash-fade {
+    0% { opacity: 0; }
+    30% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.reset-wave-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200px;
+    height: 200px;
+    margin-top: -100px;
+    margin-left: -100px;
+    border-radius: 50%;
+    border: 2px solid rgba(249, 215, 28, 0.7);
+    transform: scale(0);
+    will-change: transform, opacity;
+    animation: reset-wave-expand 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.reset-wave-ring.ring-2,
+.reset-wave-ring.ring-3 {
+    display: none;
+}
+
+@keyframes reset-wave-expand {
+    0% {
+        transform: scale(0.05);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(12);
+        opacity: 0;
+    }
+}
+
+/* Reset button pulse */
+#reset-btn.resetting {
+    animation: reset-btn-pulse 0.4s ease-out;
+}
+
+@keyframes reset-btn-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+
+/* Wish granted text - unused (kept empty for future use) */
+
+
+/* User leave animation - Instant Transmission (dematerialize into stripes) */
+.user-leaving {
+    pointer-events: none;
+    animation: user-leave-shimmer 0.9s ease-in forwards;
+    will-change: filter, opacity;
+}
+
+@keyframes user-leave-shimmer {
+    0% {
+        filter: brightness(1);
+        opacity: 1;
+    }
+    25% {
+        filter: brightness(1.8) drop-shadow(0 0 12px rgba(249, 215, 28, 0.9));
+        opacity: 1;
+    }
+    100% {
+        filter: brightness(2) drop-shadow(0 0 16px rgba(249, 215, 28, 0.8));
+        opacity: 1;
+    }
+}
+
+/* Wrapper for stripe effect - uses mask to carve horizontal gaps */
+.user-leave-stripes {
+    -webkit-mask-image: repeating-linear-gradient(
+        to bottom,
+        black 0,
+        black 3px,
+        transparent 3px,
+        transparent 5px
+    );
+    mask-image: repeating-linear-gradient(
+        to bottom,
+        black 0,
+        black 3px,
+        transparent 3px,
+        transparent 5px
+    );
+    -webkit-mask-size: 100% 200%;
+    mask-size: 100% 200%;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+    animation: user-leave-stripes-slide 0.9s ease-in forwards;
+    animation-delay: 0.1s;
+}
+
+@keyframes user-leave-stripes-slide {
+    0% {
+        -webkit-mask-position: 0 0;
+        mask-position: 0 0;
+        opacity: 1;
+    }
+    100% {
+        -webkit-mask-position: 0 100%;
+        mask-position: 0 100%;
+        opacity: 0;
+    }
+}
+
+/* Quick horizontal light streak contained within the avatar */
+.user-leave-flash {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 3px;
+    margin-top: -1.5px;
+    background: linear-gradient(to right,
+        transparent 0%,
+        rgba(255, 255, 220, 0.9) 40%,
+        rgba(249, 215, 28, 1) 50%,
+        rgba(255, 255, 220, 0.9) 60%,
+        transparent 100%);
+    filter: blur(1px);
+    box-shadow: 0 0 6px rgba(249, 215, 28, 0.9);
+    transform: scaleX(0);
+    transform-origin: center;
+    pointer-events: none;
+    animation: user-leave-flash-sweep 0.45s ease-out forwards;
+}
+
+@keyframes user-leave-flash-sweep {
+    0% { transform: scaleX(0); opacity: 0; }
+    30% { transform: scaleX(1); opacity: 1; }
+    100% { transform: scaleX(1); opacity: 0; }
+}
+
+
+
+
+/* User join animation - Fly-in from above */
+.user-joining {
+    pointer-events: none;
+    animation: user-join-drop 0.8s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+    will-change: opacity, filter;
+}
+
+@keyframes user-join-drop {
+    0% {
+        opacity: 0;
+        filter: brightness(2.5) drop-shadow(0 0 20px rgba(249, 215, 28, 1));
+    }
+    30% {
+        opacity: 1;
+        filter: brightness(2) drop-shadow(0 0 16px rgba(249, 215, 28, 0.9));
+    }
+    100% {
+        opacity: 1;
+        filter: brightness(1);
+    }
+}
+
+/* Inner avatar card drops down with bounce */
+.user-joining .dbz-participant-card {
+    animation: user-join-card-drop 0.8s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+    will-change: transform;
+    transform-origin: center bottom;
+}
+
+@keyframes user-join-card-drop {
+    0% {
+        transform: translateY(-140px) scale(0.5);
+    }
+    50% {
+        transform: translateY(0) scale(1.15);
+    }
+    70% {
+        transform: translateY(-6px) scale(0.95);
+    }
+    85% {
+        transform: translateY(0) scale(1.03);
+    }
+    100% {
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Light trail coming down from above */
+.user-join-trail {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    width: 4px;
+    height: 100px;
+    margin-left: -2px;
+    margin-bottom: 30px;
+    background: linear-gradient(to top,
+        rgba(249, 215, 28, 1) 0%,
+        rgba(255, 255, 220, 0.8) 50%,
+        transparent 100%);
+    filter: blur(2px);
+    transform-origin: bottom center;
+    pointer-events: none;
+    animation: user-join-trail-fade 0.55s ease-out forwards;
+    z-index: 1;
+}
+
+@keyframes user-join-trail-fade {
+    0% { transform: scaleY(1.2); opacity: 1; }
+    100% { transform: scaleY(0); opacity: 0; }
+}
+
+/* Impact ring that bursts when landing */
+.user-join-impact {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    margin-top: -20px;
+    margin-left: -20px;
+    border-radius: 50%;
+    border: 3px solid rgba(249, 215, 28, 0.9);
+    transform: scale(0);
+    opacity: 0;
+    pointer-events: none;
+    animation: user-join-impact-burst 0.5s ease-out forwards;
+    animation-delay: 0.45s;
+    z-index: 1;
+}
+
+@keyframes user-join-impact-burst {
+    0% { transform: scale(0); opacity: 1; }
+    100% { transform: scale(3); opacity: 0; }
+}

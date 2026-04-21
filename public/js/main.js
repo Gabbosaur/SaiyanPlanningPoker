@@ -107,12 +107,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // App State
     let sessionId = '';
+
+    // Persistent user ID across standby/reload to prevent ghost duplicates on rejoin
+    // and prevent vote abuse (multiple tabs from the same browser = same identity).
+    // Uses localStorage so all tabs in the same browser share the same user ID.
+    function getPersistentUserId() {
+        try {
+            let pid = localStorage.getItem('spp-persistent-user-id');
+            if (!pid) {
+                pid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 11);
+                localStorage.setItem('spp-persistent-user-id', pid);
+            }
+            return pid;
+        } catch (e) {
+            // localStorage unavailable, fallback to session-only id
+            return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 11);
+        }
+    }
+
     let user = {
         id: '',
+        persistentId: getPersistentUserId(),
         name: '',
         avatar: null
     };
     let participants = {};
+    const newlyJoinedIds = new Set();
     let currentCards = [];
     let hasVoted = false;
     let soundEnabled = true;
@@ -146,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Client-side heartbeat to keep connection alive
     setInterval(() => {
-        if (socket && socket.connected) {
+        if (socket && socket.connected && !document.hidden) {
             socket.emit('heartbeat');
         }
     }, 30000); // Send heartbeat every 30 seconds
@@ -165,19 +185,144 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Reset button
+    let isResetOnCooldown = false;
+    const RESET_COOLDOWN_MS = 1500;
+
+    function triggerResetCooldown() {
+        isResetOnCooldown = true;
+        resetBtn.disabled = true;
+        resetBtn.classList.add('opacity-60', 'cursor-not-allowed');
+        setTimeout(() => {
+            isResetOnCooldown = false;
+            resetBtn.disabled = false;
+            resetBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+        }, RESET_COOLDOWN_MS);
+    }
+
     resetBtn.addEventListener('click', () => {
+        if (isResetOnCooldown) {
+            console.log('Reset on cooldown, ignoring click');
+            return;
+        }
         console.log('Reset button clicked, emitting reset-votes event');
 
-        // Add visual feedback
-        resetBtn.classList.add('animate-pulse');
+        // Button pulse feedback
+        resetBtn.classList.add('resetting');
         setTimeout(() => {
-            resetBtn.classList.remove('animate-pulse');
-        }, 1000);
+            resetBtn.classList.remove('resetting');
+        }, 600);
 
         if (socket && socket.connected) {
             socket.emit('reset-votes', { sessionId, csrfToken: getCSRFToken() });
         }
     });
+
+    function playUserLeaveAnimation(userId, onComplete) {
+        const participantEl = document.querySelector(`[data-user-id="${userId}"]`);
+
+        if (!participantEl) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        // Get absolute position of the participant so we can position the ghost identically
+        const rect = participantEl.getBoundingClientRect();
+
+        // Clone the participant so the animation survives any re-render of participants
+        const ghost = participantEl.cloneNode(true);
+        ghost.removeAttribute('data-user-id');
+        ghost.style.pointerEvents = 'none';
+        ghost.style.position = 'fixed';
+        ghost.style.left = `${rect.left + rect.width / 2}px`;
+        ghost.style.top = `${rect.top + rect.height / 2}px`;
+        ghost.style.width = `${rect.width}px`;
+        ghost.style.height = `${rect.height}px`;
+        ghost.style.zIndex = '500';
+
+        // Reset className entirely and only keep our animation classes (avoid Tailwind transition interference)
+        ghost.className = 'user-leave-stripes user-leaving';
+        ghost.style.transform = 'translate(-50%, -50%)';
+
+        // Quick horizontal light sweep on the ghost
+        const flash = document.createElement('div');
+        flash.className = 'user-leave-flash';
+        ghost.appendChild(flash);
+
+        // Append ghost to body so it survives any rerender of participants
+        document.body.appendChild(ghost);
+
+        // Immediately invoke onComplete so state/UI can update without waiting
+        if (onComplete) onComplete();
+
+        // Remove the ghost after the animation
+        setTimeout(() => {
+            if (ghost.parentNode) ghost.remove();
+        }, 1000);
+    }
+
+    function playUserJoinAnimation(participantEl) {
+        if (!participantEl) return;
+
+        // Light trail coming down from above
+        const trail = document.createElement('div');
+        trail.className = 'user-join-trail';
+        participantEl.appendChild(trail);
+
+        // Impact ring when landing
+        const impact = document.createElement('div');
+        impact.className = 'user-join-impact';
+        participantEl.appendChild(impact);
+
+        // Force reflow before adding animation class to ensure it triggers
+        void participantEl.offsetWidth;
+
+        // Brightness/glow flicker on the wrapper (preserves Tailwind transform)
+        participantEl.classList.add('user-joining');
+
+        // Cleanup classes and elements after animation
+        setTimeout(() => {
+            if (!participantEl.isConnected) return;
+            participantEl.classList.remove('user-joining');
+            if (trail.parentNode) trail.remove();
+            if (impact.parentNode) impact.remove();
+        }, 1000);
+    }
+
+    function playResetAnimation() {
+        const overlay = document.createElement('div');
+        overlay.className = 'reset-wave-overlay';
+
+        const frag = document.createDocumentFragment();
+
+        const flash = document.createElement('div');
+        flash.className = 'reset-flash';
+        frag.appendChild(flash);
+
+        const ring = document.createElement('div');
+        ring.className = 'reset-wave-ring';
+        frag.appendChild(ring);
+
+        overlay.appendChild(frag);
+        document.body.appendChild(overlay);
+
+        // Play reset sound effect
+        if (soundEnabled) {
+            try {
+                const audio = new Audio('/sounds/reset-button-sound.mp3');
+                audio.volume = 0.5;
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.warn('Reset sound playback failed:', error);
+                    });
+                }
+            } catch (error) {
+                console.warn('Error playing reset sound:', error);
+            }
+        }
+
+        setTimeout(() => overlay.remove(), 800);
+    }
 
     // Handle heart button click
     if (heartButton) {
@@ -324,11 +469,37 @@ document.addEventListener('DOMContentLoaded', () => {
     function startHeartbeat() {
         if (heartbeatInterval) clearInterval(heartbeatInterval);
         heartbeatInterval = setInterval(() => {
-            if (socket && socket.connected) {
+            if (socket && socket.connected && !document.hidden) {
                 socket.emit('heartbeat');
             }
         }, 30000);
     }
+
+    // Page Visibility API: handle standby / AFK
+    // When tab becomes hidden, heartbeats stop (due to `!document.hidden` check above).
+    // Server will remove the user after INACTIVE_TIMEOUT_MS (2 min).
+    // When tab becomes visible again, re-join the session to reappear on the table.
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            console.log('Tab hidden - pausing heartbeat, will be removed if inactive');
+            return;
+        }
+
+        console.log('Tab visible again - rejoining session');
+        if (sessionId && user && user.name && socket) {
+            if (!socket.connected) {
+                // Reconnect socket if needed
+                socket.connect();
+            }
+            // Send immediate heartbeat and rejoin
+            socket.emit('heartbeat');
+            socket.emit('join-session', {
+                sessionId,
+                user,
+                csrfToken: getCSRFToken()
+            });
+        }
+    });
 
     // Create new session
     createSessionBtn.addEventListener('click', () => {
@@ -443,9 +614,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         socket.on('user-joined', (newUser) => {
+            const isNewArrival = !participants[newUser.id];
             participants[newUser.id] = newUser;
             if (currentSession) {
                 currentSession.participants = participants;
+            }
+            if (isNewArrival) {
+                newlyJoinedIds.add(newUser.id);
             }
             renderParticipants();
             updateVoteStatus(participants);
@@ -468,6 +643,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (participants[userId]) {
                 participants[userId].isConnected = false;
                 renderParticipants();
+            }
+        });
+
+        socket.on('user-removed', (userId) => {
+            // User was removed from the session (disconnected or inactive)
+            if (participants[userId]) {
+                playUserLeaveAnimation(userId, () => {
+                    delete participants[userId];
+                    if (currentSession && currentSession.users) {
+                        delete currentSession.users[userId];
+                    }
+                    if (currentSession && currentSession.votes) {
+                        delete currentSession.votes[userId];
+                    }
+                    renderParticipants();
+                    updateVoteStatus();
+                });
             }
         });
 
@@ -569,6 +761,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update the votes-reset event handler
         socket.on('votes-reset', () => {
             console.log('Received votes-reset event from server');
+            triggerResetCooldown();
+            playResetAnimation();
             resetVoting();
 
             // Update the current session state
@@ -648,6 +842,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('votes-reset', () => {
             console.log('Received votes-reset event from server');
+            triggerResetCooldown();
+            playResetAnimation();
             resetVoting();
 
             // Show a notification that voting has been reset
@@ -708,9 +904,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Track whether we've already done the initial join to avoid duplicate join-session emits
+        let hasJoinedOnce = false;
+
         // Handle reconnection success
         socket.on('connect', () => {
-            console.log('Reconnected to server');
+            console.log('Socket connected');
 
             // Hide any reconnection notification
             const notification = document.querySelector('.reconnect-notification');
@@ -718,10 +917,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 notification.remove();
             }
 
+            // Only rejoin if this is an actual reconnection (not the initial connect).
+            // The initial join-session is already emitted by the login form handler.
+            if (!hasJoinedOnce) {
+                hasJoinedOnce = true;
+                return;
+            }
+
             // Rejoin the session if we have one
             if (sessionId && user.name) {
                 console.log('Rejoining session:', sessionId);
-                console.log('Rejoining with user:', user);
                 socket.emit('join-session', {
                     sessionId,
                     user,
@@ -819,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const y = centerY + Math.sin(angle) * adjustedRadiusY;
 
             const participantEl = document.createElement('div');
-            participantEl.className = `absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ${participant.isConnected ? '' : 'opacity-50'}`;
+            participantEl.className = 'absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300';
 
             // Position the participant
             participantEl.style.left = `${x}px`;
@@ -899,6 +1104,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             participantsContainer.appendChild(participantEl);
+
+            // Play fly-in animation for newly joined users (once)
+            if (newlyJoinedIds.has(id)) {
+                newlyJoinedIds.delete(id);
+                playUserJoinAnimation(participantEl);
+            }
         });
 
         // Show/hide spectator area
@@ -928,7 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             spectatorEl.innerHTML = `
-                <div class="w-8 h-8 rounded-full overflow-hidden border-2 ${id === socket.id ? 'border-purple-400' : 'border-gray-600'} ${participant.isConnected ? '' : 'opacity-50'}" title="${sanitizeInput(participant.name)}">
+                <div class="w-8 h-8 rounded-full overflow-hidden border-2 ${id === socket.id ? 'border-purple-400' : 'border-gray-600'}" title="${sanitizeInput(participant.name)}">
                     ${avatarContent}
                 </div>
             `;
