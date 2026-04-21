@@ -57,16 +57,20 @@ function emitVoteCount(io, sessionId, session) {
 function handleJoinSession(io, socket, data) {
     console.log('JOIN SESSION RECEIVED');
     try {
-        const { sessionId, user, csrfToken } = data;
+        const { sessionId: rawSessionId, user, csrfToken } = data;
 
         if (!isValidCsrfToken(csrfToken)) {
             socket.emit('error', { message: 'Invalid request' });
             return;
         }
-        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 50) {
+        if (!rawSessionId || typeof rawSessionId !== 'string' || rawSessionId.length > 50) {
             socket.emit('error', { message: 'Invalid session ID' });
             return;
         }
+
+        // Normalize session ID to uppercase (case-insensitive joining)
+        const sessionId = rawSessionId.toUpperCase();
+
         if (!user || !user.name || typeof user.name !== 'string' || user.name.length > 100) {
             socket.emit('error', { message: 'Invalid user data' });
             return;
@@ -102,7 +106,9 @@ function handleJoinSession(io, socket, data) {
                 currentDeck: 'modifiedFibonacci',
                 showVotes: false,
                 gameActive: false,
-                lastActivity: Date.now()
+                lastActivity: Date.now(),
+                roundStartedAt: Date.now(),
+                consensusStreak: 0
             };
             console.log('Created new session:', sessionId);
         }
@@ -236,9 +242,22 @@ function handleSubmitVote(io, socket, data) {
             session.showVotes = true;
             session.results = results;
 
+            // Track consensus streak: increment on consensus, reset otherwise
+            if (results.consensus) {
+                session.consensusStreak = (session.consensusStreak || 0) + 1;
+            } else {
+                session.consensusStreak = 0;
+            }
+
+            // Detect all-zero vote easter egg (all numeric votes are 0)
+            const allZero = playerVoteValues.length > 0
+                && playerVoteValues.every((v) => Number(v) === 0);
+
             io.to(sessionId).emit('voting-complete', {
                 votes: session.votes,
-                results
+                results,
+                consensusStreak: session.consensusStreak,
+                allZero
             });
 
             if (results.consensus) {
@@ -270,8 +289,9 @@ function handleResetVotes(io, socket, data) {
         session.votes = {};
         session.showVotes = false;
         session.results = {};
+        session.roundStartedAt = Date.now();
 
-        io.to(sessionId).emit('votes-reset');
+        io.to(sessionId).emit('votes-reset', { roundStartedAt: session.roundStartedAt });
 
         const connectedPlayers = Object.values(session.users)
             .filter((u) => u.isConnected && !u.isSpectator);

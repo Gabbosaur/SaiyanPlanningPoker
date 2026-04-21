@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/reset-effect.css">
     <link rel="stylesheet" href="/css/user-transitions.css">
+    <link rel="stylesheet" href="/css/round-timer.css">
     <link rel="stylesheet" href="/css/vote-glow.css">
     <link rel="stylesheet" href="/css/card-animations.css">
     <link rel="stylesheet" href="/css/card-deal.css">
@@ -98,23 +99,36 @@
     <!-- Update the main game screen structure -->
     <div id="game-screen" class="hidden min-h-screen flex flex-col">
         <!-- Header -->
-        <header class="dbz-header p-4 flex justify-between items-center">
-            <div class="flex items-center">
-                <img src="/images/dbz-logo.png" alt="DBZ Logo" class="h-12 mr-3">
-                <h1 class="text-2xl font-bold dbz-title">Planning Poker</h1>
+        <header class="dbz-header p-2 sm:p-4 flex justify-between items-center">
+            <div class="flex items-center" style="min-width: 0;">
+                <img src="/images/dbz-logo.png" alt="DBZ Logo" class="h-8 sm:h-12 mr-2 sm:mr-3 flex-shrink-0">
+                <h1 class="spp-header-title text-xl md:text-2xl font-bold dbz-title">Planning Poker</h1>
+                <div class="spp-header-session-mobile flex items-center bg-gray-900 bg-opacity-70 px-2 py-1 rounded-lg text-sm" style="min-width: 0;">
+                    <span id="session-id-display-mobile" class="font-mono truncate"></span>
+                    <button id="copy-invite-btn-mobile" class="ml-1 text-yellow-400 hover:text-yellow-300 transition flex-shrink-0" title="Copy invite link" aria-label="Copy invite link">
+                        <i class="fas fa-link text-sm"></i>
+                    </button>
+                </div>
             </div>
-            <div class="flex items-center space-x-2">
-                <div class="hidden sm:flex items-center bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg">
+            <div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                <div class="spp-header-session flex items-center bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg">
                     <span class="mr-2">Session:</span>
                     <span id="session-id-display" class="font-mono"></span>
+                    <button id="copy-invite-btn" class="ml-2 bg-gray-700 hover:bg-yellow-500 hover:text-gray-900 text-yellow-400 transition px-2 py-0.5 rounded" title="Copy invite link" aria-label="Copy invite link">
+                        <i class="fas fa-link"></i>
+                    </button>
                 </div>
-                <div class="hidden sm:flex items-center space-x-2">
+                <div id="round-timer" class="dbz-timer flex items-center text-sm" title="Time since last reset">
+                    <i class="fas fa-bolt dbz-timer-icon mr-1"></i>
+                    <span id="round-timer-value" class="font-mono">0:00</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-2">
                     <div class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded-lg transition">
                         <span id="current-deck">Modified Fibonacci</span>
                     </div>
                 </div>
-                <button id="reset-btn" class="bg-red-600 hover:bg-red-700 px-4 py-1 rounded-lg transition">
-                    <i class="fas fa-redo mr-1"></i> <span class="hidden sm:inline">Reset</span>
+                <button id="reset-btn" class="bg-red-600 hover:bg-red-700 px-2 sm:px-4 py-1 rounded-lg transition">
+                    <i class="fas fa-redo"></i> <span class="hidden sm:inline ml-1">Reset</span>
                 </button>
                 <!-- Music Player Controls -->
                 <div class="relative">
@@ -133,8 +147,8 @@
         <main class="flex-grow flex flex-col">
             <!-- Table Area -->
             <div class="flex-grow relative">
-                <div id="table-container" class="absolute inset-0 flex items-center justify-center p-4">
-                    <div class="relative w-full h-96">
+                <div id="table-container" class="absolute inset-0 flex items-center justify-center p-2 sm:p-4">
+                    <div class="relative w-full h-64 sm:h-80 md:h-96">
                         <!-- Table -->
                         <div class="dbz-table w-full h-full rounded-full flex items-center justify-center shadow-2xl">
                             <div class="text-center">
@@ -191,17 +205,22 @@
             </div>
         </main>
 
-        <!-- Emoji Reactions Panel - Updated for responsive placement -->
+        <!-- Emoji Reactions Panel - Collapses by default, expands on hover -->
         <div id="emoji-panel"
-            class="fixed bottom-4 right-4 bg-gray-900 bg-opacity-80 rounded-lg p-2 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 shadow-lg transition-all duration-300 z-30">
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="👍">👍</button>
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="👎">👎</button>
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="❓">❓</button>
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="🎉">🎉</button>
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="😂">😂</button>
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="🔥">🔥</button>
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="⚡">⚡</button>
-            <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="💪">💪</button>
+            class="spp-emoji-panel fixed bottom-4 right-4 bg-gray-900 bg-opacity-80 rounded-lg shadow-lg transition-all duration-300 z-30">
+            <div class="spp-emoji-toggle-icon" aria-hidden="true">
+                <i class="fas fa-smile text-yellow-400 text-2xl"></i>
+            </div>
+            <div class="spp-emoji-buttons">
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="👍">👍</button>
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="👎">👎</button>
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="❓">❓</button>
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="🎉">🎉</button>
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="😂">😂</button>
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="🔥">🔥</button>
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="⚡">⚡</button>
+                <button class="emoji-btn text-2xl hover:scale-125 transition" data-emoji="💪">💪</button>
+            </div>
         </div>
 
         <!-- Compact Credit Component -->
@@ -454,6 +473,7 @@
     <script src="/js/themes.js"></script>
     <script src="/js/music-player.js"></script>
     <script src="/js/avatar-effects.js"></script>
+    <script src="/js/round-timer.js"></script>
     <script src="/js/socket-listeners.js"></script>
     <script src="/js/main.js"></script>
 </body>

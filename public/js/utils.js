@@ -130,6 +130,49 @@
         setTimeout(() => notification.remove(), 1500);
     }
 
+    /**
+     * Shows a compact DBZ-themed toast in the bottom-right corner (mobile: bottom-center).
+     * Slides in, stays for ~2.3s, slides out. Non-blocking, pointer-events: none.
+     *
+     * @param {Object} opts
+     * @param {string} [opts.title] - bold title line (e.g. "Round reset")
+     * @param {string} [opts.body] - optional secondary line
+     * @param {'default'|'info'|'success'|'warn'} [opts.variant]
+     * @param {string} [opts.icon] - optional font-awesome icon class (e.g. 'fas fa-redo')
+     */
+    function showToast({ title = '', body = '', variant = 'default', icon = 'fas fa-bolt' } = {}) {
+        const toast = document.createElement('div');
+        toast.className = `spp-toast ${variant}`;
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'spp-toast-icon';
+        const iconI = document.createElement('i');
+        iconI.className = icon;
+        iconEl.appendChild(iconI);
+
+        const textEl = document.createElement('div');
+        textEl.className = 'spp-toast-text';
+        if (title) {
+            const t = document.createElement('div');
+            t.className = 'spp-toast-title';
+            t.textContent = sanitizeInput(title);
+            textEl.appendChild(t);
+        }
+        if (body) {
+            const b = document.createElement('div');
+            b.className = 'spp-toast-body';
+            b.textContent = sanitizeInput(body);
+            textEl.appendChild(b);
+        }
+
+        toast.appendChild(iconEl);
+        toast.appendChild(textEl);
+        document.body.appendChild(toast);
+
+        // Remove after the outro animation finishes (2.3s delay + 0.4s duration)
+        setTimeout(() => toast.remove(), 2800);
+    }
+
     window.SPP = window.SPP || {};
     window.SPP.utils = {
         sanitizeInput,
@@ -140,6 +183,7 @@
         getPersistentUserId,
         generateSessionId,
         fadeOutAudio,
-        showNotification
+        showNotification,
+        showToast
     };
 })();

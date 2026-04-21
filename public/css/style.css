@@ -1872,22 +1872,6 @@ audio {
     #emoji-panel {
         bottom: 10px;
         right: 10px;
-        padding: 8px;
-        max-width: 50px;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-
-    #emoji-panel:hover {
-        max-width: 200px;
-    }
-
-    .emoji-btn {
-        width: 36px;
-        height: 36px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 
     .dbz-stat-card {
@@ -2190,3 +2174,69 @@ audio {
     }
 }
 
+
+
+/* Consensus Streak Glow - Table aura grows brighter with each consecutive consensus.
+   Activates from streak 3 onwards. The table already has a ::before pulsing border. */
+.dbz-table.streak-3 {
+    box-shadow: 0 0 35px rgba(249, 215, 28, 0.35), 0 0 60px rgba(249, 215, 28, 0.15);
+}
+
+.dbz-table.streak-3::before {
+    opacity: 0.9;
+    background: radial-gradient(ellipse at center,
+        rgba(249, 215, 28, 0.25) 0%,
+        transparent 70%);
+}
+
+.dbz-table.streak-4 {
+    box-shadow: 0 0 50px rgba(249, 215, 28, 0.5), 0 0 90px rgba(255, 149, 0, 0.25);
+}
+
+.dbz-table.streak-4::before {
+    opacity: 1;
+    background: radial-gradient(ellipse at center,
+        rgba(249, 215, 28, 0.35) 0%,
+        rgba(255, 149, 0, 0.15) 50%,
+        transparent 80%);
+}
+
+.dbz-table.streak-5 {
+    box-shadow: 0 0 65px rgba(255, 149, 0, 0.6), 0 0 120px rgba(239, 68, 68, 0.3);
+}
+
+.dbz-table.streak-5::before {
+    opacity: 1;
+    background: radial-gradient(ellipse at center,
+        rgba(255, 149, 0, 0.4) 0%,
+        rgba(239, 68, 68, 0.2) 60%,
+        transparent 90%);
+    animation: border-pulse 1.8s infinite;
+}
+
+.dbz-table.streak-6 {
+    box-shadow: 0 0 80px rgba(255, 149, 0, 0.75), 0 0 160px rgba(239, 68, 68, 0.45);
+}
+
+.dbz-table.streak-6::before {
+    opacity: 1;
+    background: radial-gradient(ellipse at center,
+        rgba(255, 149, 0, 0.5) 0%,
+        rgba(239, 68, 68, 0.3) 60%,
+        transparent 95%);
+    animation: border-pulse 1.3s infinite;
+}
+
+.dbz-table.streak-max {
+    box-shadow: 0 0 100px rgba(239, 68, 68, 0.9), 0 0 200px rgba(249, 215, 28, 0.6);
+}
+
+.dbz-table.streak-max::before {
+    opacity: 1;
+    background: radial-gradient(ellipse at center,
+        rgba(255, 255, 220, 0.4) 0%,
+        rgba(255, 149, 0, 0.55) 40%,
+        rgba(239, 68, 68, 0.3) 75%,
+        transparent 100%);
+    animation: border-pulse 0.9s infinite;
+}

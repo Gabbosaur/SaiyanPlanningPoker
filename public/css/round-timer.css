@@ -1,0 +1,323 @@
+/* Round Timer - DBZ Scouter style */
+.dbz-timer {
+    position: relative;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(26, 42, 74, 0.9) 0%, rgba(15, 24, 48, 0.9) 100%);
+    border: 1px solid rgba(249, 215, 28, 0.4);
+    color: #fbbf24;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    box-shadow: inset 0 0 8px rgba(249, 215, 28, 0.12);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden;
+}
+
+.dbz-timer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(249, 215, 28, 0.08) 50%,
+        transparent 100%);
+    transform: translateX(-100%);
+    pointer-events: none;
+    animation: timer-sweep 4s ease-in-out infinite;
+}
+
+@keyframes timer-sweep {
+    0%, 100% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+}
+
+.dbz-timer-icon {
+    color: #fbbf24;
+    filter: drop-shadow(0 0 4px rgba(249, 215, 28, 0.6));
+    animation: timer-icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes timer-icon-pulse {
+    0%, 100% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Warm-up stage (after ~1 min): orange tint, slightly faster sweep */
+.dbz-timer.timer-warm {
+    border-color: rgba(255, 149, 0, 0.6);
+    color: #ff9500;
+    box-shadow: inset 0 0 10px rgba(255, 149, 0, 0.2), 0 0 8px rgba(255, 149, 0, 0.15);
+}
+
+.dbz-timer.timer-warm::before {
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 149, 0, 0.15) 50%,
+        transparent 100%);
+    animation-duration: 2.5s;
+}
+
+.dbz-timer.timer-warm .dbz-timer-icon {
+    color: #ff9500;
+    filter: drop-shadow(0 0 6px rgba(255, 149, 0, 0.8));
+}
+
+/* Hot stage (after ~3 min): red tint, fast sweep, strong glow */
+.dbz-timer.timer-hot {
+    border-color: rgba(239, 68, 68, 0.8);
+    color: #fca5a5;
+    box-shadow: inset 0 0 14px rgba(239, 68, 68, 0.3), 0 0 14px rgba(239, 68, 68, 0.35);
+    animation: timer-hot-shake 0.3s ease-in-out infinite;
+}
+
+@keyframes timer-hot-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-0.5px); }
+    75% { transform: translateX(0.5px); }
+}
+
+.dbz-timer.timer-hot::before {
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(239, 68, 68, 0.25) 50%,
+        transparent 100%);
+    animation-duration: 1.5s;
+}
+
+.dbz-timer.timer-hot .dbz-timer-icon {
+    color: #ef4444;
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9));
+    animation-duration: 1s;
+}
+
+/* Reset pulse - plays briefly when the timer resets to 0:00 */
+.dbz-timer.timer-reset-pulse {
+    animation: timer-reset-flash 0.6s ease-out;
+}
+
+@keyframes timer-reset-flash {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(249, 215, 28, 0);
+    }
+    40% {
+        transform: scale(1.08);
+        box-shadow: 0 0 20px 4px rgba(249, 215, 28, 0.6);
+        border-color: rgba(249, 215, 28, 1);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(249, 215, 28, 0);
+    }
+}
+
+
+/* Subtle toast banner (used e.g. after reset) */
+.spp-toast {
+    position: fixed;
+    top: 80px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(42, 63, 95, 0.95) 0%, rgba(26, 42, 74, 0.95) 100%);
+    border: 1px solid rgba(249, 215, 28, 0.4);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 12px rgba(249, 215, 28, 0.2);
+    color: #fff;
+    font-size: 0.9rem;
+    max-width: 320px;
+    z-index: 1000;
+    pointer-events: none;
+    transform: translateX(calc(100% + 24px));
+    opacity: 0;
+    animation: spp-toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+               spp-toast-out 0.4s ease-in 2.3s forwards;
+}
+
+@keyframes spp-toast-in {
+    from { transform: translateX(calc(100% + 24px)); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes spp-toast-out {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(calc(100% + 24px)); opacity: 0; }
+}
+
+.spp-toast-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 35% 30%, #fff8dc 0%, #ffcc33 40%, #ff8800 100%);
+    color: #8b0000;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(255, 200, 0, 0.6);
+    animation: spp-toast-icon-spin 0.8s ease-out;
+}
+
+@keyframes spp-toast-icon-spin {
+    from { transform: rotate(-180deg) scale(0.5); }
+    to   { transform: rotate(0) scale(1); }
+}
+
+.spp-toast-text {
+    line-height: 1.25;
+}
+
+.spp-toast-title {
+    font-weight: 700;
+    color: #fbbf24;
+    letter-spacing: 0.3px;
+}
+
+.spp-toast-body {
+    color: #d1d5db;
+    font-size: 0.82rem;
+}
+
+/* Variants */
+.spp-toast.info .spp-toast-icon {
+    background: radial-gradient(circle at 35% 30%, #93c5fd 0%, #3b82f6 60%, #1e3a8a 100%);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+.spp-toast.info { border-color: rgba(59, 130, 246, 0.45); }
+.spp-toast.info .spp-toast-title { color: #93c5fd; }
+
+.spp-toast.success .spp-toast-icon {
+    background: radial-gradient(circle at 35% 30%, #bbf7d0 0%, #22c55e 60%, #14532d 100%);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+.spp-toast.success { border-color: rgba(34, 197, 94, 0.45); }
+.spp-toast.success .spp-toast-title { color: #86efac; }
+
+.spp-toast.warn .spp-toast-icon {
+    background: radial-gradient(circle at 35% 30%, #fde68a 0%, #f59e0b 60%, #78350f 100%);
+    color: #fff;
+}
+.spp-toast.warn { border-color: rgba(245, 158, 11, 0.45); }
+.spp-toast.warn .spp-toast-title { color: #fcd34d; }
+
+/* Mobile: top center below navbar */
+@media (max-width: 640px) {
+    .spp-toast {
+        top: 72px;
+        right: 50%;
+        transform: translateX(calc(50% + 0px));
+    }
+    @keyframes spp-toast-in {
+        from { transform: translate(50%, -30px); opacity: 0; }
+        to   { transform: translate(50%, 0); opacity: 1; }
+    }
+    @keyframes spp-toast-out {
+        from { transform: translate(50%, 0); opacity: 1; }
+        to   { transform: translate(50%, -30px); opacity: 0; }
+    }
+}
+
+
+/* Emoji panel: collapsed by default (smile icon), expands on hover / focus-within */
+.spp-emoji-panel {
+    padding: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.spp-emoji-toggle-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.25s ease, opacity 0.2s ease;
+    font-size: 1.1rem;
+}
+
+/* Touch devices only: the icon is tappable to toggle the panel */
+@media (hover: none) {
+    .spp-emoji-toggle-icon {
+        cursor: pointer;
+    }
+}
+
+.spp-emoji-toggle-icon:hover {
+    transform: scale(1.1);
+}
+
+.spp-emoji-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 2px;
+    max-width: 0;
+    max-height: 32px;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-width 0.35s ease, opacity 0.25s ease, margin-left 0.35s ease;
+    margin-left: 0;
+}
+
+.spp-emoji-panel:hover .spp-emoji-buttons,
+.spp-emoji-panel:focus-within .spp-emoji-buttons,
+.spp-emoji-panel.expanded .spp-emoji-buttons {
+    max-width: 420px;
+    opacity: 1;
+    margin-left: 6px;
+}
+
+.spp-emoji-panel:hover .spp-emoji-toggle-icon,
+.spp-emoji-panel:focus-within .spp-emoji-toggle-icon,
+.spp-emoji-panel.expanded .spp-emoji-toggle-icon {
+    opacity: 0.55;
+}
+
+.spp-emoji-panel .emoji-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* Touch devices: also expand on tap (using .expanded class toggled in JS) */
+@media (hover: none) {
+    .spp-emoji-panel:hover .spp-emoji-buttons {
+        max-width: 0;
+        opacity: 0;
+        margin-left: 0;
+    }
+}
+
+
+/* Header responsive visibility (replaces Tailwind responsive utilities for reliability) */
+.spp-header-title,
+.spp-header-session {
+    display: none;
+}
+.spp-header-session-mobile {
+    display: flex;
+}
+
+@media (min-width: 640px) {
+    .spp-header-title {
+        display: block;
+    }
+    .spp-header-session {
+        display: flex;
+    }
+    .spp-header-session-mobile {
+        display: none;
+    }
+}

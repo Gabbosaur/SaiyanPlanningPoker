@@ -4,7 +4,7 @@
 (function () {
     'use strict';
 
-    const { sanitizeInput, setSafeContent, getCSRFToken, showNotification } = window.SPP.utils;
+    const { sanitizeInput, setSafeContent, getCSRFToken, showNotification, showToast } = window.SPP.utils;
     const { playUserLeaveAnimation, playResetAnimation } = window.SPP.animations;
 
     /**
@@ -80,6 +80,23 @@
             : deckType === 'modifiedFibonacci' ? 'Modified Fibonacci'
             : 'T-shirt Sizes';
 
+        /**
+         * Applies the table glow based on the current consensus streak.
+         * No visible effect below 3. Beyond 6 caps at "streak-max".
+         */
+        function applyConsensusStreakGlow(streak) {
+            const table = document.querySelector('.dbz-table');
+            if (!table) return;
+            // Strip previous streak classes
+            ['streak-3', 'streak-4', 'streak-5', 'streak-6', 'streak-max']
+                .forEach((c) => table.classList.remove(c));
+            if (streak >= 7) table.classList.add('streak-max');
+            else if (streak === 6) table.classList.add('streak-6');
+            else if (streak === 5) table.classList.add('streak-5');
+            else if (streak === 4) table.classList.add('streak-4');
+            else if (streak === 3) table.classList.add('streak-3');
+        }
+
         socket.on('session-joined', (data) => {
             const { session, cardDecks } = data;
             loginScreen.classList.add('hidden');
@@ -96,6 +113,13 @@
             setIsSpectator(session.users[socket.id]?.isSpectator || false);
             renderParticipants();
             updateVoteStatus(session.users);
+
+            if (window.SPP.roundTimer) {
+                window.SPP.roundTimer.start(session.roundStartedAt);
+            }
+
+            // Sync consensus streak glow
+            applyConsensusStreakGlow(session.consensusStreak || 0);
 
             if (session.showVotes && session.results) {
                 showResults(session.votes, session.results);
@@ -203,7 +227,7 @@
         });
 
         socket.on('voting-complete', (data) => {
-            const { votes, results } = data;
+            const { votes, results, consensusStreak, allZero } = data;
 
             const currentSession = getCurrentSession();
             if (currentSession) {
@@ -231,25 +255,50 @@
 
             showResults(votes, results);
 
+            // Update table glow based on consensus streak (kicks in at 3+)
+            applyConsensusStreakGlow(consensusStreak || 0);
+
+            // All-zero easter egg
+            if (allZero) {
+                showToast({
+                    title: 'Wow, così faciiile!',
+                    body: 'All zeros — Krillin approves 👊',
+                    variant: 'info',
+                    icon: 'fas fa-fist-raised'
+                });
+            }
+
             document.querySelectorAll('.dbz-card-btn').forEach((card) => {
                 card.disabled = true;
                 card.classList.add('opacity-50', 'cursor-not-allowed');
             });
         });
 
-        socket.on('votes-reset', () => {
+        socket.on('votes-reset', (data) => {
             triggerResetCooldown();
             playResetAnimation({ soundEnabled: deps.isSoundEnabled ? deps.isSoundEnabled() : false });
             resetVoting();
+
+            if (window.SPP.roundTimer) {
+                window.SPP.roundTimer.start(data && data.roundStartedAt);
+            }
 
             const currentSession = getCurrentSession();
             if (currentSession) {
                 currentSession.votes = {};
                 currentSession.showVotes = false;
                 currentSession.results = {};
+                if (data && data.roundStartedAt) {
+                    currentSession.roundStartedAt = data.roundStartedAt;
+                }
             }
 
-            showNotification('Voting has been reset! You can now vote again.', 'success');
+            showToast({
+                title: 'Round reset!',
+                body: 'Power up and vote again',
+                variant: 'success',
+                icon: 'fas fa-redo'
+            });
         });
 
         socket.on('vote-count-updated', (data) => {

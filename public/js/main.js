@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setSafeContent,
         getPersistentUserId,
         generateSessionId,
-        showNotification
+        showNotification,
+        showToast
     } = window.SPP.utils;
 
     // DOM Elements
@@ -19,6 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const avatarUpload = document.getElementById('avatar-upload');
     const avatarPreview = document.getElementById('avatar-preview');
     const sessionIdDisplay = document.getElementById('session-id-display');
+    const sessionIdDisplayMobile = document.getElementById('session-id-display-mobile');
+    const copyInviteBtn = document.getElementById('copy-invite-btn');
+    const copyInviteBtnMobile = document.getElementById('copy-invite-btn-mobile');
     const participantsContainer = document.getElementById('participants-container');
     const cardsContainer = document.getElementById('cards-container');
     const voteStatus = document.getElementById('vote-status');
@@ -55,6 +59,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // App State
     let sessionId = '';
+
+    // Pre-fill session ID if present in URL (?session=XYZ)
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionFromUrl = urlParams.get('session');
+        if (sessionFromUrl && /^[A-Za-z0-9_-]{1,50}$/.test(sessionFromUrl) && sessionIdInput) {
+            sessionIdInput.value = sessionFromUrl.toUpperCase();
+        }
+    } catch (e) {
+        console.warn('Failed to read session from URL:', e);
+    }
 
     let user = {
         id: '',
@@ -161,6 +176,61 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Copy invite link - builds a URL with ?session=ID so the invitee only needs to enter their name
+    async function copyInviteLink(triggerBtn) {
+        if (!sessionId) return;
+        const url = `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(sessionId)}`;
+
+        const fallbackCopy = (text) => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand('copy');
+            } finally {
+                ta.remove();
+            }
+        };
+
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                fallbackCopy(url);
+            }
+            showToast({
+                title: 'Invite link copied!',
+                body: 'Share it with your team',
+                variant: 'success',
+                icon: 'fas fa-link'
+            });
+
+            // Quick visual confirmation on the triggering button
+            if (triggerBtn) {
+                const icon = triggerBtn.querySelector('i');
+                if (icon) {
+                    const prev = icon.className;
+                    icon.className = 'fas fa-check';
+                    setTimeout(() => { icon.className = prev; }, 1200);
+                }
+            }
+        } catch (error) {
+            console.warn('Copy failed:', error);
+            showToast({
+                title: 'Copy failed',
+                body: 'Please copy the URL manually',
+                variant: 'warn',
+                icon: 'fas fa-exclamation-triangle'
+            });
+        }
+    }
+
+    if (copyInviteBtn) copyInviteBtn.addEventListener('click', () => copyInviteLink(copyInviteBtn));
+    if (copyInviteBtnMobile) copyInviteBtnMobile.addEventListener('click', () => copyInviteLink(copyInviteBtnMobile));
+
     // Animations moved to animations.js (window.SPP.animations)
     const playUserLeaveAnimation = window.SPP.animations.playUserLeaveAnimation;
     const playUserJoinAnimation = window.SPP.animations.playUserJoinAnimation;
@@ -248,7 +318,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle login form submission
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const sessionIdValue = sessionIdInput.value.trim() || generateSessionId();
+        // Normalize to uppercase so "abc123", "Abc123", "ABC123" map to the same session
+        const sessionIdValue = (sessionIdInput.value.trim() || generateSessionId()).toUpperCase();
         const usernameValue = usernameInput.value.trim();
 
         if (!usernameValue) {
@@ -428,7 +499,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.SPP.socketListeners.register(socket, {
             loginScreen,
             gameScreen,
-            sessionIdDisplay,
+            sessionIdDisplay: {
+                // Virtual element that writes text to both desktop and mobile displays
+                set textContent(v) {
+                    if (sessionIdDisplay) sessionIdDisplay.textContent = v;
+                    if (sessionIdDisplayMobile) sessionIdDisplayMobile.textContent = v;
+                }
+            },
             currentDeckEl: currentDeck,
             voteCounter,
             voteStatus,
@@ -1247,47 +1324,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // Add emoji panel toggle for mobile
-    let emojiPanelExpanded = false;
+    // Emoji panel: on touch devices (no hover), tap the icon to toggle the panel.
+    // On desktop the CSS :hover already handles expansion.
+    const emojiToggleIcon = emojiPanel.querySelector('.spp-emoji-toggle-icon');
+    if (emojiToggleIcon) {
+        emojiToggleIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            emojiPanel.classList.toggle('expanded');
+        });
 
-    // Create a toggle button for mobile
-    const emojiToggle = document.createElement('button');
-    emojiToggle.className = 'fixed bottom-4 right-4 bg-gray-900 bg-opacity-80 rounded-full p-3 shadow-lg z-40 sm:hidden';
-    emojiToggle.innerHTML = '<i class="fas fa-smile text-yellow-500"></i>';
-    document.body.appendChild(emojiToggle);
-
-    // Toggle emoji panel on mobile
-    emojiToggle.addEventListener('click', () => {
-        emojiPanelExpanded = !emojiPanelExpanded;
-        if (emojiPanelExpanded) {
-            emojiPanel.style.maxWidth = '200px';
-            emojiPanel.style.maxHeight = '300px';
-            emojiToggle.style.transform = 'rotate(180deg)';
-        } else {
-            emojiPanel.style.maxWidth = '50px';
-            emojiPanel.style.maxHeight = '50px';
-            emojiToggle.style.transform = 'rotate(0deg)';
-        }
-    });
-
-    // Hide toggle button on larger screens
-    function checkScreenSize() {
-        if (window.innerWidth >= 640) {
-            emojiToggle.style.display = 'none';
-            emojiPanel.style.maxWidth = '';
-            emojiPanel.style.maxHeight = '';
-        } else {
-            emojiToggle.style.display = 'block';
-            if (!emojiPanelExpanded) {
-                emojiPanel.style.maxWidth = '50px';
-                emojiPanel.style.maxHeight = '50px';
+        // Collapse on outside click (touch devices)
+        document.addEventListener('click', (e) => {
+            if (!emojiPanel.contains(e.target)) {
+                emojiPanel.classList.remove('expanded');
             }
-        }
+        });
     }
-
-    // Check screen size on load and resize
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
 
     // Music Player extracted to music-player.js (window.SPP.musicPlayer)
     // fadeOutAudio imported at top via utils destructuring
