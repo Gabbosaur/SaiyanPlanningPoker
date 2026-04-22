@@ -83,7 +83,7 @@
      * Stages 1-3 grow the charge orb and play the charging sound.
      * Stage 4 fires the full-screen wave and plays the fire sound.
      */
-    function playKamehamehaStage({ stage, fromName } = {}) {
+    function playKamehamehaStage({ stage, fromName, fromUserId } = {}) {
         if (!stage) return;
 
         if (stage < 4) {
@@ -93,7 +93,7 @@
             // Fire!
             stopChargingSound();
             showCaptionIfAny(fromName);
-            fireWave();
+            fireWave(fromUserId);
         }
     }
 
@@ -134,7 +134,7 @@
 
     // --- Fire (stage 4) ---
 
-    function fireWave() {
+    function fireWave(fromUserId) {
         // Flash/orb burst at the firing point
         const burst = document.createElement('div');
         burst.className = 'kamehameha-charge charge-stage-4';
@@ -165,8 +165,95 @@
                 setTimeout(() => shakeTarget.classList.remove('kamehameha-shake'), 900);
             }
 
+            // Knock everyone away (except the caster) with a staggered sweep
+            applyKnockbackToParticipants(fromUserId);
+
             setTimeout(() => wave.remove(), 1900);
         }, 250);
+    }
+
+    /**
+     * Pushes away every participant avatar (except the caster).
+     * Timing is a simple left-to-right sweep based on horizontal position.
+     * Also applies a visible "stunned" aura on every hit avatar for everyone
+     * to see, and flags the local user via a body class so the main app can
+     * disable their punch interactions.
+     */
+    function applyKnockbackToParticipants(casterId) {
+        const WAVE_DURATION_MS = 1600; // keep in sync with the CSS travel animation
+        const STUN_DURATION_MS = 15000; // must match the server-side stun window
+        const viewportWidth = window.innerWidth;
+
+        const participantEls = document.querySelectorAll('[data-user-id]');
+        const localSocketId = getSocketRef() ? getSocketRef().id : null;
+
+        participantEls.forEach((el) => {
+            const userId = el.getAttribute('data-user-id');
+            if (casterId && userId === casterId) return;
+
+            const rect = el.getBoundingClientRect();
+            const elCenterX = rect.left + rect.width / 2;
+
+            // Time for the wave's leading edge to reach this X (linear approximation).
+            const progress = Math.min(1, Math.max(0, (elCenterX + viewportWidth * 0.4) / (viewportWidth * 1.9)));
+            const hitDelay = progress * WAVE_DURATION_MS;
+
+            setTimeout(() => {
+                el.classList.add('kamehameha-hit');
+                setTimeout(() => el.classList.remove('kamehameha-hit'), 1800);
+
+                // Add the visible stunned aura (stars + wobble) AFTER the knockback
+                // finishes so the two animations don't clash on the same element.
+                const KNOCKBACK_MS = 1800;
+                setTimeout(() => {
+                    el.classList.add('kamehameha-stunned-visual');
+                    addStunStars(el);
+                }, KNOCKBACK_MS);
+
+                setTimeout(() => {
+                    el.classList.remove('kamehameha-stunned-visual');
+                    removeStunStars(el);
+                }, STUN_DURATION_MS);
+
+                // If this avatar is the local user, also stun their input
+                if (localSocketId && userId === localSocketId) {
+                    document.body.classList.add('kamehameha-stunned');
+                    setTimeout(() => document.body.classList.remove('kamehameha-stunned'), STUN_DURATION_MS);
+                }
+            }, hitDelay);
+        });
+    }
+
+    function addStunStars(participantEl) {
+        // Create 3 rotating "stunned" stars orbiting the avatar card.
+        // They share the same rotating parent so they orbit together,
+        // each with its own angular offset.
+        const card = participantEl.querySelector('.dbz-participant-card');
+        if (!card) return;
+
+        // Avoid duplicate layers if something retriggers
+        removeStunStars(participantEl);
+
+        const orbit = document.createElement('div');
+        orbit.className = 'kamehameha-stun-orbit';
+
+        for (let i = 0; i < 3; i++) {
+            const star = document.createElement('div');
+            star.className = 'kamehameha-stun-star';
+            star.style.transform = `rotate(${i * 120}deg) translateX(30px)`;
+            star.textContent = '★';
+            orbit.appendChild(star);
+        }
+
+        card.appendChild(orbit);
+    }
+
+    function removeStunStars(participantEl) {
+        participantEl.querySelectorAll('.kamehameha-stun-orbit').forEach((el) => el.remove());
+    }
+
+    function getSocketRef() {
+        return socketGetter ? socketGetter() : socketRef;
     }
 
     function showCaptionIfAny(fromName) {

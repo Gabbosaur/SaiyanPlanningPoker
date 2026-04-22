@@ -155,13 +155,13 @@
         if (title) {
             const t = document.createElement('div');
             t.className = 'spp-toast-title';
-            t.textContent = sanitizeInput(title);
+            t.textContent = title;
             textEl.appendChild(t);
         }
         if (body) {
             const b = document.createElement('div');
             b.className = 'spp-toast-body';
-            b.textContent = sanitizeInput(body);
+            b.textContent = body;
             textEl.appendChild(b);
         }
 

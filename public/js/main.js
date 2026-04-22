@@ -616,6 +616,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 participantEl.style.cursor = 'pointer';
                 participantEl.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    // Stunned by a recent kamehameha? Can't punch for a few seconds.
+                    if (document.body.classList.contains('kamehameha-stunned')) {
+                        showToast({
+                            title: 'Stunned!',
+                            body: "You can't attack while recovering",
+                            variant: 'warn',
+                            icon: 'fas fa-dizzy'
+                        });
+                        return;
+                    }
                     if (!isAnimating) {
                         socket.emit('user-collision', {
                             sessionId,

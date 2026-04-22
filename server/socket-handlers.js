@@ -35,7 +35,7 @@ function registerSocketHandlers(io) {
         socket.on('update-avatar', (data) => handleUpdateAvatar(io, socket, data));
         socket.on('super-saiyan', (data) => handleSuperSaiyan(io, data));
         socket.on('kamehameha', (data) => handleKamehameha(io, socket, data));
-        socket.on('user-collision', (data) => handleUserCollision(io, data));
+        socket.on('user-collision', (data) => handleUserCollision(io, socket, data));
         socket.on('toggle-spectator', (data) => handleToggleSpectator(io, socket, data));
     });
 }
@@ -390,6 +390,11 @@ const kamehamehaStageThrottles = new Map();
 const KAMEHAMEHA_FIRE_COOLDOWN_MS = 3500;
 const KAMEHAMEHA_STAGE_THROTTLE_MS = 250;
 
+// Kamehameha stun: socket.id -> expiry timestamp (ms since epoch).
+// Stunned players cannot punch others (user-collision is rejected server-side).
+const STUN_DURATION_MS = 15000;
+const kamehamehaStun = new Map();
+
 function handleKamehameha(io, socket, data) {
     const { sessionId, stage } = data || {};
     if (!sessionId || !sessions[sessionId] || !sessions[sessionId].users[socket.id]) return;
@@ -402,6 +407,12 @@ function handleKamehameha(io, socket, data) {
         const last = kamehamehaFireCooldowns.get(socket.id) || 0;
         if (now - last < KAMEHAMEHA_FIRE_COOLDOWN_MS) return;
         kamehamehaFireCooldowns.set(socket.id, now);
+
+        // Everyone in the session (except the caster) is stunned for STUN_DURATION_MS
+        Object.keys(sessions[sessionId].users).forEach((uid) => {
+            if (uid === socket.id) return;
+            kamehamehaStun.set(uid, now + STUN_DURATION_MS);
+        });
     } else {
         const last = kamehamehaStageThrottles.get(socket.id) || 0;
         if (now - last < KAMEHAMEHA_STAGE_THROTTLE_MS) return;
@@ -412,19 +423,27 @@ function handleKamehameha(io, socket, data) {
     if (stageNum === 4) {
         console.log(`Kamehameha fired by ${fromName} in session ${sessionId}`);
     }
-    io.to(sessionId).emit('kamehameha-fired', { stage: stageNum, fromName });
+    io.to(sessionId).emit('kamehameha-fired', {
+        stage: stageNum,
+        fromName,
+        fromUserId: socket.id
+    });
 }
 
-function handleUserCollision(io, data) {
+function handleUserCollision(io, socket, data) {
     const { sessionId, attackerId, targetId } = data;
-    if (sessions[sessionId]) {
-        io.to(sessionId).emit('collision-animation', {
-            attackerId: sanitizeInput(attackerId),
-            targetId: sanitizeInput(targetId),
-            attackerName: sanitizeInput(sessions[sessionId].users[attackerId]?.name || 'Unknown'),
-            targetName: sanitizeInput(sessions[sessionId].users[targetId]?.name || 'Unknown')
-        });
-    }
+    if (!sessions[sessionId]) return;
+
+    // Reject punches from stunned attackers
+    const stunUntil = kamehamehaStun.get(attackerId) || 0;
+    if (Date.now() < stunUntil) return;
+
+    io.to(sessionId).emit('collision-animation', {
+        attackerId: sanitizeInput(attackerId),
+        targetId: sanitizeInput(targetId),
+        attackerName: sanitizeInput(sessions[sessionId].users[attackerId]?.name || 'Unknown'),
+        targetName: sanitizeInput(sessions[sessionId].users[targetId]?.name || 'Unknown')
+    });
 }
 
 function handleToggleSpectator(io, socket, data) {

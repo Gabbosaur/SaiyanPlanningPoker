@@ -208,3 +208,106 @@
     50%      { transform: translate(3px, -3px); }
     75%      { transform: translate(-2px, -2px); }
 }
+
+
+/* Knockback: participants caught in the wave's path get pushed to the right,
+   spin a bit, then spring back to their original spot. */
+.kamehameha-hit .dbz-participant-card {
+    animation: kamehameha-knockback 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform, filter;
+}
+
+@keyframes kamehameha-knockback {
+    0% {
+        transform: translateX(0) rotate(0deg) scale(1);
+        filter: brightness(1);
+    }
+    15% {
+        transform: translateX(80px) rotate(15deg) scale(1.05);
+        filter: brightness(1.5) drop-shadow(0 0 8px rgba(147, 197, 253, 0.8));
+    }
+    35% {
+        transform: translateX(140px) rotate(25deg) scale(0.95);
+        filter: brightness(1.2);
+    }
+    55% {
+        transform: translateX(120px) rotate(15deg) scale(1);
+        filter: brightness(1);
+    }
+    75% {
+        transform: translateX(40px) rotate(-5deg) scale(1);
+    }
+    90% {
+        transform: translateX(10px) rotate(2deg) scale(1);
+    }
+    100% {
+        transform: translateX(0) rotate(0deg) scale(1);
+    }
+}
+
+
+/* Kamehameha stun: while active, the local user can't punch others.
+   Visual cue on the user's own avatar + non-allowed cursor on everyone else. */
+body.kamehameha-stunned [data-user-id] {
+    cursor: not-allowed !important;
+}
+
+body.kamehameha-stunned [data-user-id] .dbz-participant-card {
+    filter: grayscale(0.35) brightness(0.9);
+}
+
+
+/* Dizzy stars orbiting a stunned avatar - visible to everyone */
+.kamehameha-stun-orbit {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 25;
+    animation: kameha-stun-orbit-rotate 1.6s linear infinite;
+    will-change: transform;
+    transform-origin: 0 0;
+}
+
+.kamehameha-stun-star {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    color: #fde047;
+    text-shadow:
+        0 0 6px rgba(253, 224, 71, 0.95),
+        0 0 12px rgba(250, 204, 21, 0.7),
+        0 1px 2px rgba(0, 0, 0, 0.7);
+    transform-origin: 0 0;
+    animation: kameha-stun-star-pop 0.4s ease-out;
+}
+
+@keyframes kameha-stun-orbit-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+@keyframes kameha-stun-star-pop {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+/* Subtle wobble on the stunned avatar card itself */
+.kamehameha-stunned-visual .dbz-participant-card {
+    animation: kameha-stun-wobble 1.4s ease-in-out infinite;
+}
+
+@keyframes kameha-stun-wobble {
+    0%, 100% { transform: rotate(0deg); }
+    25%      { transform: rotate(-3deg); }
+    75%      { transform: rotate(3deg); }
+}

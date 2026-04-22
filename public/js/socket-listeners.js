@@ -382,7 +382,8 @@
             if (window.SPP.easterEggs && window.SPP.easterEggs.playKamehamehaStage) {
                 window.SPP.easterEggs.playKamehamehaStage({
                     stage: (data && data.stage) || 4,
-                    fromName: data && data.fromName
+                    fromName: data && data.fromName,
+                    fromUserId: data && data.fromUserId
                 });
             }
         });
