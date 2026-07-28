@@ -58,12 +58,16 @@ function securityHeaders(req, res, next) {
     res.setHeader(
         'Content-Security-Policy',
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdn.jsdelivr.net; " +
+        // 'wasm-unsafe-eval' + blob: required by MediaPipe tasks-vision (WASM + workers)
+        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://cdn.socket.io https://cdn.jsdelivr.net; " +
+        "worker-src 'self' blob:; " +
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
         "img-src 'self' data:; " +
         "font-src 'self' https://cdnjs.cloudflare.com; " +
-        "connect-src 'self' ws: wss: https://cdn.socket.io; " +
-        "media-src 'self';"
+        // cdn.jsdelivr.net (wasm binaries) + storage.googleapis.com (hand model)
+        "connect-src 'self' ws: wss: https://cdn.socket.io https://cdn.jsdelivr.net https://storage.googleapis.com; " +
+        // blob: for the mirrored webcam stream
+        "media-src 'self' blob:;"
     );
     next();
 }

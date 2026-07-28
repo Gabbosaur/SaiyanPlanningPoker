@@ -108,6 +108,16 @@ document.addEventListener('DOMContentLoaded', () => {
         setSoundEnabled: (v) => { soundEnabled = v; }
     });
 
+    // Hand-gesture control (webcam) - extracted to hand-control.js. Opt-in, default OFF.
+    const handControlToggle = document.getElementById('hand-control-toggle');
+    if (window.SPP.handControl && handControlToggle) {
+        const handControl = window.SPP.handControl.create({
+            onStart: () => handControlToggle.classList.add('active'),
+            onStop: () => handControlToggle.classList.remove('active')
+        });
+        handControlToggle.addEventListener('click', () => handControl.toggle());
+    }
+
     // Credit component
     if (!creditComponent || !heartButton || !creditCard) {
         console.error('Credit component elements not found');
@@ -555,11 +565,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Render participants around the table
+    /**
+     * Collapses participant socket ids that belong to the same person.
+     * Returns the ids to actually render. Entries with the same persistentId
+     * are merged, preferring a connected socket, then the current socket, then
+     * the last one seen. Entries without a persistentId are always kept.
+     */
+    function dedupeParticipantIds(ids) {
+        const byPersistent = new Map();
+        const result = [];
+
+        ids.forEach((id) => {
+            const p = participants[id];
+            if (!p) return;
+            const pid = p.persistentId;
+            if (!pid) {
+                // No stable identity to dedupe on — keep as-is.
+                result.push(id);
+                return;
+            }
+            const existingId = byPersistent.get(pid);
+            if (existingId === undefined) {
+                byPersistent.set(pid, id);
+                return;
+            }
+            // Decide which of the two duplicates to keep.
+            const existing = participants[existingId];
+            const keepNew =
+                // Prefer connected over disconnected.
+                (p.isConnected && !existing.isConnected) ||
+                // Then prefer this browser's own live socket.
+                (id === (socket && socket.id));
+            if (keepNew) byPersistent.set(pid, id);
+        });
+
+        // Rebuild list: deduped persistent-id winners + all pid-less entries,
+        // preserving original ordering for stable positioning.
+        const winners = new Set([...byPersistent.values(), ...result]);
+        return ids.filter((id) => winners.has(id));
+    }
+
     function renderParticipants() {
         participantsContainer.innerHTML = '';
         spectatorContainer.innerHTML = '';
-        
-        const participantIds = Object.keys(participants);
+
+        // Client-side safeguard against ghost/duplicate avatars: if the same
+        // person (same persistentId) appears under more than one socket id
+        // (e.g. a reconnect after standby before the server dedups), keep only
+        // one entry per person. Prefer a connected socket, then the newest one.
+        const participantIds = dedupeParticipantIds(Object.keys(participants));
         const players = participantIds.filter(id => !participants[id].isSpectator);
         const spectators = participantIds.filter(id => participants[id].isSpectator);
         const totalParticipants = players.length;
