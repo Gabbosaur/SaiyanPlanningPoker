@@ -48,6 +48,16 @@
     // is well below 1.0. ~1.1 requires a genuine curl without being fussy.
     const FINGER_CURL_RATIO = 1.1;
 
+    // --- Temporal smoothing of the curl count ----------------------------
+    // Rotating the wrist (e.g. spinning a grabbed avatar) makes landmarks noisy
+    // and the per-frame curl count flicker. We smooth it over a short window
+    // and take the median, which rejects single-frame spikes.
+    const CURL_HISTORY_SIZE = 5;
+
+    // While a grab is active, an accidental release is far worse than a slightly
+    // late one, so the hand must read as open for this long before letting go.
+    const GRAB_RELEASE_HOLD_MS = 220;
+
     // Pinch detection: thumb tip (4) to index tip (8), normalised by hand span
     // (wrist 0 -> middle-base 9). Hysteresis: below CLOSE engages, above OPEN
     // releases. Thumb+index is the most reliable pair (least self-occlusion).
@@ -96,12 +106,20 @@
         '#music-player-toggle',
         '#copy-invite-btn',
         '#create-session-btn',
-        'button[type="submit"]'
+        'button[type="submit"]',
+        // Participant avatars: closing the fist on one grabs it.
+        '#participants-container [data-user-id]'
     ].join(',');
 
     // Targets that require a held-pinch confirmation (hard to undo / affects
     // everyone in the session).
     const DESTRUCTIVE_SELECTOR = '#reset-btn';
+
+    // Participant avatars around the table. Closing the fist on one GRABS it
+    // (drag & throw) instead of issuing a click.
+    const GRAB_SELECTOR = '#participants-container [data-user-id]';
+    // Velocity used for the throw is measured over this window.
+    const FLICK_SAMPLE_MS = 120;
 
     /**
      * @param {Object} deps
@@ -150,6 +168,12 @@
         // with the hand already closed/pinched never fires a click.
         let gestureJustClosed = false;
 
+        // Rolling history of the curled-finger count, median-filtered to ride
+        // out the landmark noise caused by wrist rotation.
+        const curlHistory = [];
+        // Timestamp when the hand first looked open during an active grab.
+        let openSince = 0;
+
         // Reliability gate
         let reliable = true;
         let reliableSince = 0;
@@ -168,6 +192,13 @@
         // Confirm (held fist) state
         let confirmTarget = null;
         let confirmStartAt = 0;
+
+        // Grab state: which avatar we're currently holding, where we grabbed
+        // from, and a short history of pointer samples to compute the flick.
+        let grabTargetId = null;
+        let grabOriginX = 0;
+        let grabOriginY = 0;
+        const flickSamples = [];
 
         // Magnetic dock effect on the vote cards
         const MAGNET_RADIUS = 240;      // px of horizontal influence
@@ -518,7 +549,11 @@
             const hands = result && result.landmarks;
 
             if (!hands || hands.length === 0) {
-                if (now - lastHandSeen > HAND_LOST_MS) {
+                // Be more patient while holding someone: fast wrist rotation can
+                // make the tracker drop the hand for a few frames, and that
+                // shouldn't tear the grab away mid-spin.
+                const lostTolerance = grabTargetId ? HAND_LOST_MS * 2 : HAND_LOST_MS;
+                if (now - lastHandSeen > lostTolerance) {
                     hidePointer();
                     setStatus('searching', 'Show your hand ✋');
                     resetInteractionState();
@@ -581,8 +616,30 @@
                 const released = pinchRatio(lm) > PINCH_OPEN;
                 updateGestureState(engaged, released, now);
             } else {
-                const curled = countCurledFingers(lm);
-                updateGestureState(curled >= FIST_CLOSE, curled <= FIST_OPEN, now);
+                // Median-filter the curl count so wrist rotation noise (which
+                // makes single frames read as "open") can't drop the gesture.
+                curlHistory.push(countCurledFingers(lm));
+                if (curlHistory.length > CURL_HISTORY_SIZE) curlHistory.shift();
+                const sorted = curlHistory.slice().sort((a, b) => a - b);
+                const curled = sorted[Math.floor(sorted.length / 2)];
+
+                let looksOpen = curled <= FIST_OPEN;
+
+                // While holding an avatar, require the hand to look open for a
+                // sustained period before releasing. A brief misread mid-spin
+                // should never fling the victim away.
+                if (grabTargetId) {
+                    if (looksOpen) {
+                        if (!openSince) openSince = now;
+                        if (now - openSince < GRAB_RELEASE_HOLD_MS) looksOpen = false;
+                    } else {
+                        openSince = 0;
+                    }
+                } else {
+                    openSince = 0;
+                }
+
+                updateGestureState(curled >= FIST_CLOSE, looksOpen, now);
             }
 
             updateMagnet(smoothX, smoothY);
@@ -792,10 +849,13 @@
                 if (currentTarget) currentTarget.classList.remove('hand-hover-zoom');
                 currentTarget = target;
                 targetEnteredAt = now;
-                // Enlarge the new target so it's easier to click. Vote cards are
-                // handled by the magnet effect instead, so skip them here to
-                // avoid two transforms fighting over the same element.
-                if (target && !target.classList.contains('dbz-card-btn')) {
+                // Enlarge the new target so it's easier to click. Skipped for:
+                //  - vote cards: the magnet effect already scales them
+                //  - avatars: the grab physics owns their transform, and
+                //    hand-hover-zoom uses !important which would override it
+                if (target
+                    && !target.classList.contains('dbz-card-btn')
+                    && !target.hasAttribute('data-user-id')) {
                     target.classList.add('hand-hover-zoom');
                 }
                 // Moving to a different target cancels an in-progress confirm.
@@ -803,14 +863,29 @@
             }
 
             pointerEl.classList.toggle('over-target', !!target);
+            // Distinct cue for avatars: they're grabbed, not clicked.
+            pointerEl.classList.toggle('over-avatar',
+                !!(target && target.hasAttribute('data-user-id')));
         }
 
         // ------------------------------------------------------------------
         // Interaction: decide when to click / confirm
         // ------------------------------------------------------------------
         function handleInteraction(now) {
+            // An in-progress grab takes priority over everything else.
+            if (grabTargetId) {
+                updateGrab(now);
+                return;
+            }
+
             if (!currentTarget) {
                 cancelConfirm();
+                return;
+            }
+
+            // Closing the fist on an avatar starts a grab instead of a click.
+            if (currentTarget.matches(GRAB_SELECTOR)) {
+                if (gestureJustClosed) startGrab(currentTarget);
                 return;
             }
 
@@ -835,6 +910,66 @@
                 lastClickAt = now;
                 clickArmed = false; // require an open hand before next click
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Grab & throw an avatar
+        // ------------------------------------------------------------------
+        function startGrab(el) {
+            const userId = el.getAttribute('data-user-id');
+            if (!userId || !deps.onGrabStart) return;
+            // Ask the server for permission; it may reject (cooldown, the
+            // target is still voting, already grabbed, ...). We only start
+            // rendering locally once the server broadcasts the grab.
+            grabTargetId = userId;
+            grabOriginX = smoothX;
+            grabOriginY = smoothY;
+            flickSamples.length = 0;
+            deps.onGrabStart(userId);
+        }
+
+        function updateGrab(now) {
+            // Released the fist -> throw.
+            if (!isGesture) {
+                endGrab();
+                return;
+            }
+
+            const dx = smoothX - grabOriginX;
+            const dy = smoothY - grabOriginY;
+
+            // Track recent pointer samples for the flick velocity.
+            flickSamples.push({ t: now, x: smoothX, y: smoothY });
+            while (flickSamples.length > 2
+                && now - flickSamples[0].t > FLICK_SAMPLE_MS) {
+                flickSamples.shift();
+            }
+
+            if (deps.onGrabMove) {
+                // Normalise to viewport so all clients agree regardless of size.
+                deps.onGrabMove(grabTargetId,
+                    dx / window.innerWidth, dy / window.innerHeight);
+            }
+        }
+
+        function endGrab() {
+            if (!grabTargetId) return;
+
+            // Flick velocity = displacement over the sample window, expressed
+            // as a fraction of the viewport per frame.
+            let vx = 0, vy = 0;
+            if (flickSamples.length >= 2) {
+                const first = flickSamples[0];
+                const last = flickSamples[flickSamples.length - 1];
+                const dt = Math.max(16, last.t - first.t);
+                // px per frame (assuming ~16ms frames)
+                vx = ((last.x - first.x) / dt) * 16 / window.innerWidth;
+                vy = ((last.y - first.y) / dt) * 16 / window.innerHeight;
+            }
+
+            if (deps.onGrabEnd) deps.onGrabEnd(grabTargetId, vx, vy);
+            grabTargetId = null;
+            flickSamples.length = 0;
         }
 
         function handleDestructive(now) {
@@ -868,9 +1003,13 @@
         }
 
         function resetInteractionState() {
+            // Losing tracking must not leave someone held.
+            if (grabTargetId) endGrab();
             isGesture = false;
             clickArmed = true;
             reliable = true;
+            curlHistory.length = 0;
+            openSince = 0;
             prevThumb = prevIndex = null;
             if (currentTarget) currentTarget.classList.remove('hand-hover-zoom');
             currentTarget = null;

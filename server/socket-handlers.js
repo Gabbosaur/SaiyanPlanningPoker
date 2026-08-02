@@ -37,6 +37,9 @@ function registerSocketHandlers(io) {
         socket.on('kamehameha', (data) => handleKamehameha(io, socket, data));
         socket.on('user-collision', (data) => handleUserCollision(io, socket, data));
         socket.on('toggle-spectator', (data) => handleToggleSpectator(io, socket, data));
+        socket.on('grab-start', (data) => handleGrabStart(io, socket, data));
+        socket.on('grab-move', (data) => handleGrabMove(io, socket, data));
+        socket.on('grab-end', (data) => handleGrabEnd(io, socket, data));
     });
 }
 
@@ -156,6 +159,9 @@ function handleJoinSession(io, socket, data) {
 
 function handleDisconnect(io, socket) {
     console.log('User disconnected:', socket.id);
+
+    // Release any grab this socket was involved in (as grabber or victim).
+    cleanupGrabsFor(io, socket.id);
 
     Object.keys(sessions).forEach((sessionId) => {
         const session = sessions[sessionId];
@@ -478,6 +484,150 @@ function handleToggleSpectator(io, socket, data) {
         console.error('Error toggling spectator:', error);
         socket.emit('error', { message: 'Failed to toggle spectator mode' });
     }
+}
+
+// --- Grab & throw (playful avatar drag) ------------------------------------
+// Anti-abuse rules, all enforced server-side:
+//   * one active grab per grabber, and a victim can only be grabbed by one
+//     person at a time (first come wins)
+//   * a grab auto-expires after GRAB_MAX_HOLD_MS so nobody can be held hostage
+//   * cooldown between grabs by the same grabber
+//   * you cannot grab a player who hasn't voted yet in the current round
+//     (never interfere with someone who's still deciding), nor yourself
+//   * move events are rate limited and their payload is clamped
+const GRAB_MAX_HOLD_MS = 4000;
+const GRAB_COOLDOWN_MS = 5000;
+const GRAB_MOVE_MIN_INTERVAL_MS = 45; // ~22 updates/sec ceiling
+
+// grabberSocketId -> { sessionId, targetId, startedAt, lastMoveAt, timer }
+const activeGrabs = new Map();
+// victimSocketId -> grabberSocketId
+const grabbedBy = new Map();
+// grabberSocketId -> timestamp of last grab end
+const grabCooldowns = new Map();
+
+function endGrab(io, grabberId, opts = {}) {
+    const grab = activeGrabs.get(grabberId);
+    if (!grab) return;
+    if (grab.timer) clearTimeout(grab.timer);
+    activeGrabs.delete(grabberId);
+    grabbedBy.delete(grab.targetId);
+    grabCooldowns.set(grabberId, Date.now());
+
+    io.to(grab.sessionId).emit('user-grab-ended', {
+        grabberId,
+        targetId: grab.targetId,
+        vx: typeof opts.vx === 'number' ? opts.vx : 0,
+        vy: typeof opts.vy === 'number' ? opts.vy : 0
+    });
+}
+
+function handleGrabStart(io, socket, data) {
+    try {
+        const { sessionId, targetId, csrfToken } = data || {};
+        if (!isValidCsrfToken(csrfToken)) return;
+
+        const session = sessions[sessionId];
+        if (!session || !session.users[socket.id]) return;
+        // Can't grab yourself, or a user who isn't in the session.
+        if (!targetId || targetId === socket.id || !session.users[targetId]) return;
+        // Spectators don't take part in the horseplay.
+        if (session.users[socket.id].isSpectator) return;
+
+        // Don't disturb someone who is still deciding their vote.
+        const targetIsPlayer = !session.users[targetId].isSpectator;
+        const targetHasVoted = Object.hasOwn(session.votes, targetId);
+        if (targetIsPlayer && !session.showVotes && !targetHasVoted) {
+            socket.emit('grab-rejected', { reason: 'still-voting' });
+            return;
+        }
+
+        // One grab at a time per grabber.
+        if (activeGrabs.has(socket.id)) return;
+        // The victim must be free: not already held by someone else...
+        if (grabbedBy.has(targetId)) {
+            socket.emit('grab-rejected', { reason: 'already-held' });
+            return;
+        }
+        // ...and not currently grabbing someone themselves. This keeps
+        // interactions as clean 1:1 pairs (no C->A->B chains, no pile-ons).
+        if (activeGrabs.has(targetId)) {
+            socket.emit('grab-rejected', { reason: 'busy' });
+            return;
+        }
+
+        // Cooldown.
+        const last = grabCooldowns.get(socket.id) || 0;
+        const remaining = GRAB_COOLDOWN_MS - (Date.now() - last);
+        if (remaining > 0) {
+            socket.emit('grab-rejected', { reason: 'cooldown', remainingMs: remaining });
+            return;
+        }
+
+        const grab = {
+            sessionId,
+            targetId,
+            startedAt: Date.now(),
+            lastMoveAt: 0,
+            timer: null
+        };
+        // Auto-release so a victim is never stuck.
+        grab.timer = setTimeout(() => endGrab(io, socket.id), GRAB_MAX_HOLD_MS);
+
+        activeGrabs.set(socket.id, grab);
+        grabbedBy.set(targetId, socket.id);
+
+        io.to(sessionId).emit('user-grab-started', {
+            grabberId: socket.id,
+            targetId,
+            grabberName: sanitizeInput(session.users[socket.id].name || 'Someone'),
+            targetName: sanitizeInput(session.users[targetId].name || 'Someone')
+        });
+    } catch (error) {
+        console.error('Error in grab-start:', error);
+    }
+}
+
+function handleGrabMove(io, socket, data) {
+    const grab = activeGrabs.get(socket.id);
+    if (!grab) return;
+
+    const now = Date.now();
+    if (now - grab.lastMoveAt < GRAB_MOVE_MIN_INTERVAL_MS) return;
+    grab.lastMoveAt = now;
+
+    // Offsets arrive normalised to the viewport (-1..1); clamp defensively.
+    const clamp = (v) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return 0;
+        return Math.max(-1, Math.min(1, n));
+    };
+
+    io.to(grab.sessionId).emit('user-grab-moved', {
+        grabberId: socket.id,
+        targetId: grab.targetId,
+        dx: clamp(data && data.dx),
+        dy: clamp(data && data.dy)
+    });
+}
+
+function handleGrabEnd(io, socket, data) {
+    const clampV = (v) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return 0;
+        return Math.max(-1, Math.min(1, n));
+    };
+    endGrab(io, socket.id, {
+        vx: clampV(data && data.vx),
+        vy: clampV(data && data.vy)
+    });
+}
+
+/** Releases any grab involving this socket (called on disconnect). */
+function cleanupGrabsFor(io, socketId) {
+    if (activeGrabs.has(socketId)) endGrab(io, socketId);
+    const grabber = grabbedBy.get(socketId);
+    if (grabber) endGrab(io, grabber);
 }
 
 module.exports = { registerSocketHandlers };

@@ -180,3 +180,216 @@
     0% { transform: scale(0); opacity: 1; }
     100% { transform: scale(3); opacity: 0; }
 }
+
+/* --- Grab & throw ------------------------------------------------------- */
+/* While grabbed the transform is driven per-frame by JS, so any CSS
+   transition must be off or the motion feels mushy and lags behind. */
+.user-grabbed {
+    transition: none !important;
+    cursor: grabbing;
+    filter: drop-shadow(0 0 14px rgba(249, 215, 28, 0.8));
+    z-index: 400;
+}
+
+/* Ki aura while being held */
+.user-grabbed .dbz-participant-card {
+    box-shadow: 0 0 22px rgba(249, 215, 28, 0.9),
+                0 0 44px rgba(255, 140, 0, 0.5);
+    border-color: #f9d71c !important;
+}
+
+/* Motion streaks while flying after release */
+.user-thrown {
+    filter: drop-shadow(0 0 10px rgba(120, 200, 255, 0.7));
+}
+
+/* --- Ki beam linking grabber to victim ---------------------------------- */
+#ki-beam-layer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 390;
+    overflow: visible;
+}
+
+/* Wide soft glow underneath */
+.ki-beam-glow {
+    stroke: rgba(255, 170, 40, 0.35);
+    stroke-width: 16;
+    stroke-linecap: round;
+    filter: blur(6px);
+}
+
+/* Bright energy core, animated dashes to suggest flowing ki */
+.ki-beam {
+    stroke: rgba(255, 240, 170, 0.95);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 14 10;
+    animation: ki-beam-flow 0.45s linear infinite,
+               ki-beam-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes ki-beam-flow {
+    to { stroke-dashoffset: -24; }
+}
+
+@keyframes ki-beam-pulse {
+    from { stroke-width: 3; opacity: 0.85; }
+    to   { stroke-width: 6; opacity: 1; }
+}
+
+/* --- Grabber aura (who is doing the grabbing) --------------------------- */
+.user-grabbing {
+    z-index: 395;
+}
+
+.user-grabbing .dbz-participant-card {
+    box-shadow: 0 0 20px rgba(255, 170, 40, 0.95),
+                0 0 46px rgba(255, 120, 0, 0.6);
+    border-color: #ffae2b !important;
+    animation: grabber-pulse 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes grabber-pulse {
+    from { transform: scale(1); }
+    to   { transform: scale(1.09); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ki-beam { animation: none; }
+    .user-grabbing .dbz-participant-card { animation: none; }
+}
+
+/* --- Wall slam: cracks, debris, screen shake ---------------------------- */
+
+/* Crack decal drawn at the impact point */
+.wall-crack {
+    position: fixed;
+    width: 120px;
+    height: 120px;
+    margin-left: -60px;
+    margin-top: -60px;
+    pointer-events: none;
+    z-index: 420;
+    transform: rotate(var(--crack-rot, 0deg)) scale(var(--crack-scale, 1));
+    animation: wall-crack-fade 0.75s ease-out forwards;
+    /* Radiating fracture lines built from layered gradients */
+    background:
+        conic-gradient(from 0deg,
+            transparent 0deg 8deg, rgba(255,255,255,0.95) 9deg 10deg, transparent 11deg 52deg,
+            rgba(255,255,255,0.85) 53deg 54deg, transparent 55deg 104deg,
+            rgba(255,255,255,0.9) 105deg 106deg, transparent 107deg 158deg,
+            rgba(255,255,255,0.8) 159deg 160deg, transparent 161deg 212deg,
+            rgba(255,255,255,0.9) 213deg 214deg, transparent 215deg 266deg,
+            rgba(255,255,255,0.85) 267deg 268deg, transparent 269deg 318deg,
+            rgba(255,255,255,0.9) 319deg 320deg, transparent 321deg 360deg),
+        radial-gradient(circle,
+            rgba(255,255,255,0.95) 0%,
+            rgba(255,230,150,0.6) 18%,
+            rgba(255,170,40,0.25) 38%,
+            transparent 62%);
+    -webkit-mask: radial-gradient(circle, #000 0%, #000 48%, transparent 70%);
+    mask: radial-gradient(circle, #000 0%, #000 48%, transparent 70%);
+}
+
+@keyframes wall-crack-fade {
+    0%   { opacity: 1; }
+    35%  { opacity: 0.95; }
+    100% { opacity: 0; }
+}
+
+/* Flying debris shards */
+.wall-debris {
+    position: fixed;
+    pointer-events: none;
+    z-index: 421;
+    background: linear-gradient(135deg, #fff 0%, #ffd88a 50%, #ff9d2b 100%);
+    box-shadow: 0 0 6px 2px rgba(255, 190, 70, 0.7);
+    border-radius: 2px;
+    animation: wall-debris-fly 0.6s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+}
+
+@keyframes wall-debris-fly {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) rotate(0deg) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--spin, 180deg)) scale(0.3);
+    }
+}
+
+/* Avatar squashes on impact */
+.user-slammed .dbz-participant-card {
+    animation: avatar-squash 0.26s ease-out;
+}
+
+@keyframes avatar-squash {
+    0%   { transform: scale(1.35, 0.65); filter: brightness(2); }
+    60%  { transform: scale(0.9, 1.12); filter: brightness(1.2); }
+    100% { transform: scale(1, 1); filter: brightness(1); }
+}
+
+/* Screen shake */
+.screen-shake {
+    animation: screen-shake-anim 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.screen-shake-hard {
+    animation: screen-shake-hard-anim 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes screen-shake-anim {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-5px, 3px); }
+    40% { transform: translate(4px, -3px); }
+    60% { transform: translate(-3px, 2px); }
+    80% { transform: translate(3px, -1px); }
+}
+
+@keyframes screen-shake-hard-anim {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    15% { transform: translate(-11px, 6px) rotate(-0.6deg); }
+    30% { transform: translate(9px, -7px) rotate(0.5deg); }
+    45% { transform: translate(-8px, 5px) rotate(-0.4deg); }
+    60% { transform: translate(7px, -4px) rotate(0.3deg); }
+    80% { transform: translate(-4px, 2px) rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wall-crack, .wall-debris { display: none; }
+    .screen-shake, .screen-shake-hard,
+    .user-slammed .dbz-participant-card { animation: none; }
+}
+
+/* Hover cue: this avatar can be grabbed */
+#hand-pointer.over-avatar {
+    background: radial-gradient(circle at 35% 30%,
+            rgba(255, 255, 255, 0.98) 0%,
+            rgba(190, 255, 200, 0.9) 30%,
+            rgba(60, 220, 120, 0.8) 60%,
+            rgba(20, 160, 80, 0.4) 100%) !important;
+    box-shadow: 0 0 16px 6px rgba(80, 230, 140, 0.8),
+                0 0 34px 14px rgba(30, 180, 90, 0.45) !important;
+}
+
+/* --- Keep grabs visible during the consensus celebration ---------------- */
+/* The celebration overlay is full-screen and lasts ~5s, which is exactly when
+ * grabbing unlocks. Fade it right down (it's already pointer-events:none) so
+ * the grab stays readable, and lift the table above it. */
+body.grab-in-progress #celebration-overlay {
+    opacity: 0.12 !important;
+    transition: opacity 0.25s ease-out;
+}
+
+body.grab-in-progress #table-container,
+body.grab-in-progress #participants-container {
+    z-index: 380;
+}
+
+/* Grabbed/grabbing avatars and the ki beam already sit at 390-400, so they
+ * render above the dimmed celebration layer. */

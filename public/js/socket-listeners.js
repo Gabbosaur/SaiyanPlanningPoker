@@ -378,6 +378,63 @@
             triggerSuperSaiyan(userId);
         });
 
+        // --- Grab & throw (server-validated, everyone sees it) --------------
+        socket.on('user-grab-started', (data) => {
+            const grab = deps.getUserGrab && deps.getUserGrab();
+            if (grab) grab.begin(data.targetId, data.grabberId);
+        });
+
+        socket.on('user-grab-moved', (data) => {
+            const grab = deps.getUserGrab && deps.getUserGrab();
+            if (!grab) return;
+            // Offsets arrive normalised to the sender's viewport.
+            grab.setTarget(data.targetId,
+                data.dx * window.innerWidth,
+                data.dy * window.innerHeight);
+        });
+
+        socket.on('user-grab-ended', (data) => {
+            const grab = deps.getUserGrab && deps.getUserGrab();
+            if (!grab) return;
+            grab.release(data.targetId,
+                (data.vx || 0) * window.innerWidth,
+                (data.vy || 0) * window.innerHeight);
+        });
+
+        socket.on('grab-rejected', (data) => {
+            const reason = data && data.reason;
+            if (reason === 'still-voting') {
+                showToast({
+                    title: 'Non ora!',
+                    body: 'Sta ancora votando, lascialo in pace',
+                    variant: 'warn',
+                    icon: 'fas fa-hand-paper'
+                });
+            } else if (reason === 'cooldown') {
+                const secs = Math.ceil((data.remainingMs || 0) / 1000);
+                showToast({
+                    title: 'Recupera energia',
+                    body: `Riprova tra ${secs}s`,
+                    variant: 'warn',
+                    icon: 'fas fa-hourglass-half'
+                });
+            } else if (reason === 'already-held') {
+                showToast({
+                    title: 'Occupato!',
+                    body: 'È già nelle mani di qualcun altro',
+                    variant: 'warn',
+                    icon: 'fas fa-hands'
+                });
+            } else if (reason === 'busy') {
+                showToast({
+                    title: 'È impegnato!',
+                    body: 'Sta afferrando qualcun altro',
+                    variant: 'warn',
+                    icon: 'fas fa-hand-rock'
+                });
+            }
+        });
+
         socket.on('kamehameha-fired', (data) => {
             if (window.SPP.easterEggs && window.SPP.easterEggs.playKamehamehaStage) {
                 window.SPP.easterEggs.playKamehamehaStage({

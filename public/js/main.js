@@ -108,12 +108,33 @@ document.addEventListener('DOMContentLoaded', () => {
         setSoundEnabled: (v) => { soundEnabled = v; }
     });
 
+    // Grab & throw physics for avatars - extracted to user-grab.js
+    const userGrab = window.SPP.userGrab
+        ? window.SPP.userGrab.create({ isSoundEnabled: () => soundEnabled })
+        : null;
+
     // Hand-gesture control (webcam) - extracted to hand-control.js. Opt-in, default OFF.
     const handControlToggle = document.getElementById('hand-control-toggle');
     if (window.SPP.handControl && handControlToggle) {
         const handControl = window.SPP.handControl.create({
             onStart: () => handControlToggle.classList.add('active'),
-            onStop: () => handControlToggle.classList.remove('active')
+            onStop: () => {
+                handControlToggle.classList.remove('active');
+                if (userGrab) userGrab.cancelAll();
+            },
+            // Grab & throw: the server validates and broadcasts, so everyone
+            // sees the same thing and abuse rules are enforced centrally.
+            onGrabStart: (targetId) => {
+                if (socket && sessionId) {
+                    socket.emit('grab-start', { sessionId, targetId, csrfToken: getCSRFToken() });
+                }
+            },
+            onGrabMove: (targetId, dx, dy) => {
+                if (socket && sessionId) socket.emit('grab-move', { dx, dy });
+            },
+            onGrabEnd: (targetId, vx, vy) => {
+                if (socket && sessionId) socket.emit('grab-end', { vx, vy });
+            }
         });
         handControlToggle.addEventListener('click', () => handControl.toggle());
     }
@@ -540,7 +561,8 @@ document.addEventListener('DOMContentLoaded', () => {
             triggerSuperSaiyan,
             animateSmoothPunchBroadcast,
             showReconnectNotification,
-            updateConnectionStatus
+            updateConnectionStatus,
+            getUserGrab: () => userGrab
         });
     }
 
