@@ -1,0 +1,20 @@
+# Normalise line endings so the repo doesn't churn when the project is edited
+# from a mix of Windows, WSL and Linux tooling.
+#
+# Text files are stored with LF in the repository; Git converts on checkout
+# according to each developer's core.autocrlf setting.
+* text=auto eol=lf
+
+# Explicitly binary, so Git never tries to normalise or diff them as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.task binary
