@@ -76,6 +76,22 @@
             updateConnectionStatus
         } = deps;
 
+        /**
+         * Reflects a user's webcam-hand-mode / hands-raised state on their
+         * avatar, so everyone understands what's going on without guessing.
+         */
+        function applyHandStatus(userId) {
+            const el = document.querySelector(`[data-user-id="${userId}"]`);
+            if (!el) return;
+            const p = getParticipants()[userId];
+            if (!p) return;
+            el.classList.toggle('hand-mode-on', !!p.handMode);
+            el.classList.toggle('hands-raised', !!p.handsRaised);
+            // Distinguish one arm from two, so the extra effort is visible.
+            el.classList.toggle('one-arm', (p.raisedHands || 0) === 1);
+            el.classList.toggle('both-arms', (p.raisedHands || 0) >= 2);
+        }
+
         const deckLabel = (deckType) => deckType === 'fibonacci' ? 'Fibonacci'
             : deckType === 'modifiedFibonacci' ? 'Modified Fibonacci'
             : 'T-shirt Sizes';
@@ -431,6 +447,44 @@
                     body: 'Sta afferrando qualcun altro',
                     variant: 'warn',
                     icon: 'fas fa-hand-rock'
+                });
+            }
+        });
+
+        // --- Webcam hand-mode / Genkidama status indicators -----------------
+        socket.on('hand-mode-updated', (data) => {
+            const participants = getParticipants();
+            if (participants[data.userId]) {
+                participants[data.userId].handMode = !!data.enabled;
+                if (!data.enabled) participants[data.userId].handsRaised = false;
+                applyHandStatus(data.userId);
+            }
+        });
+
+        socket.on('hands-raised-updated', (data) => {
+            const participants = getParticipants();
+            if (participants[data.userId]) {
+                participants[data.userId].handsRaised = !!data.raised;
+                participants[data.userId].raisedHands = data.hands || 0;
+                applyHandStatus(data.userId);
+            }
+        });
+
+        socket.on('genkidama-progress', (data) => {
+            const g = deps.getGenkidama && deps.getGenkidama();
+            if (g) g.setProgress(data || {});
+        });
+
+        socket.on('genkidama-fired', (data) => {
+            const g = deps.getGenkidama && deps.getGenkidama();
+            if (g) g.fire({ donors: data.donors, donorNames: data.donorNames });
+        });
+
+        socket.on('konami-activated', (data) => {
+            if (window.SPP.easterEggs && window.SPP.easterEggs.playKonami) {
+                window.SPP.easterEggs.playKonami({
+                    userId: data && data.userId,
+                    fromName: data && data.fromName
                 });
             }
         });

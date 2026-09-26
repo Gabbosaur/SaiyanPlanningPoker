@@ -1,0 +1,554 @@
+/* genkidama.css - Spirit Bomb ritual + webcam hand-mode status indicators */
+
+/* ===== Avatar status indicators ========================================== */
+/* So teammates can tell who's on webcam hand mode, and who is donating. */
+
+/* Hand-mode badge.
+ * IMPORTANT: it must live on the participant WRAPPER, not on
+ * .dbz-participant-card — that card is `overflow:hidden; border-radius:50%`, so
+ * anything anchored to it gets clipped into the circle (which just looked like a
+ * mystery glyph inside the avatar). */
+.hand-mode-on::after {
+    /* Plain Unicode rather than a Font Awesome glyph: the project pins FA
+       6.0.0-beta3, where several hand icon codepoints differ, so an icon font
+       reference here silently rendered nothing. */
+    content: "\270B";               /* ✋ raised hand */
+    font-family: inherit;
+    position: absolute;
+    bottom: 22px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: 2px solid rgba(15, 23, 42, 0.95);
+    box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.7);
+    z-index: 30;
+    pointer-events: none;
+}
+
+/* Subtle blue ring so hand-mode users read at a glance */
+.hand-mode-on .dbz-participant-card {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.55),
+                0 0 14px 2px rgba(59, 130, 246, 0.35);
+}
+
+/* Badge turns bright while donating */
+.hand-mode-on.hands-raised::after {
+    background: linear-gradient(135deg, #93c5fd, #3b82f6);
+    box-shadow: 0 0 14px 4px rgba(147, 197, 253, 0.9);
+}
+
+
+
+/* --- Hands raised: the avatar lifts and glows with donated ki ----------- */
+.hands-raised .dbz-participant-card {
+    animation: hands-raised-float 1.6s ease-in-out infinite alternate;
+    box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.85),
+                0 0 26px 8px rgba(96, 165, 250, 0.75),
+                0 -18px 34px 6px rgba(191, 219, 254, 0.5) !important;
+    border-color: #bfdbfe !important;
+}
+
+@keyframes hands-raised-float {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-7px); }
+}
+
+/* Rising arrow above a donating avatar. Also on the wrapper (see note above)
+ * so it isn't clipped by the circular, overflow-hidden avatar card. */
+.hands-raised::before {
+    content: "\2191";               /* ↑ upwards arrow (font-independent) */
+    font-family: inherit;
+    font-weight: 900;
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    font-size: 18px;
+    color: #bfdbfe;
+    text-shadow: 0 0 10px rgba(147, 197, 253, 1),
+                 0 0 20px rgba(59, 130, 246, 0.9);
+    animation: hands-raised-arrow 1.1s ease-out infinite;
+    z-index: 30;
+    pointer-events: none;
+}
+
+/* The animation supplies the -50% X translate that centres the arrow, so it
+   must be present in every keyframe (otherwise it snaps off-centre). */
+@keyframes hands-raised-arrow {
+    0%   { opacity: 0; transform: translate(-50%, 6px); }
+    40%  { opacity: 1; transform: translate(-50%, -2px); }
+    100% { opacity: 0; transform: translate(-50%, -14px); }
+}
+
+/* One arm vs both arms. These MUST come after the .hands-raised rules above:
+   same specificity means source order decides, and placing them earlier let
+   .hands-raised override them. */
+.one-arm .dbz-participant-card {
+    animation-duration: 2s;
+}
+
+.both-arms .dbz-participant-card {
+    animation-duration: 1.1s;
+    box-shadow: 0 0 0 4px rgba(191, 219, 254, 0.95),
+                0 0 34px 12px rgba(96, 165, 250, 0.9),
+                0 -24px 46px 10px rgba(191, 219, 254, 0.65) !important;
+}
+
+/* Two arrows for both arms, one for a single arm */
+.both-arms::before {
+    content: "\2191\2009\2191";     /* two arrows, thin space between */
+    letter-spacing: 2px;
+}
+
+/* ===== Darkened sky ===================================================== */
+.genkidama-sky {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    /* Darkens progressively with --sky-strength (0..1), set from the energy
+       gathered, so a single donor is barely noticeable and it deepens as more
+       people join. */
+    transition: opacity 1.6s ease-in-out;
+    background:
+        radial-gradient(ellipse at 50% 10%,
+            rgba(37, 99, 235, 0.35) 0%,
+            rgba(15, 23, 42, 0.55) 45%,
+            rgba(2, 6, 23, 0.85) 100%);
+}
+
+.genkidama-sky.active {
+    opacity: calc(0.25 + var(--sky-strength, 0) * 0.75);
+}
+
+/* ===== The sphere ======================================================= */
+.genkidama-sphere {
+    position: fixed;
+    /* Anchored low enough that a fully-gathered sphere (up to ~1.25 scale, plus
+       the ritual boost and release bloom) still fits below the top edge. */
+    top: 26%;
+    left: 50%;
+    width: 260px;
+    height: 260px;
+    margin-left: -130px;
+    margin-top: -130px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    /* --sphere-scale is eased frame-by-frame from JS (custom properties don't
+       interpolate in transitions unless registered with @property), so only
+       opacity is transitioned here. */
+    transform: translateZ(0) scale(var(--sphere-scale, 0.3));
+    transition: opacity 1.1s ease-out;
+    will-change: transform;
+}
+
+.genkidama-sphere.active {
+    opacity: 1;
+}
+
+.genkidama-core,
+.genkidama-glow,
+.genkidama-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+}
+
+/* Bright churning core */
+.genkidama-core {
+    background: radial-gradient(circle at 42% 38%,
+            #ffffff 0%,
+            #dbeafe 22%,
+            #93c5fd 48%,
+            #3b82f6 74%,
+            rgba(29, 78, 216, 0.55) 100%);
+    box-shadow:
+        0 0 60px 20px rgba(147, 197, 253, 0.9),
+        0 0 140px 50px rgba(59, 130, 246, 0.65),
+        inset 0 0 50px 12px rgba(255, 255, 255, 0.6);
+    animation: genkidama-churn 3.4s ease-in-out infinite alternate;
+}
+
+@keyframes genkidama-churn {
+    from { transform: scale(0.97) rotate(0deg); filter: hue-rotate(0deg); }
+    to   { transform: scale(1.03) rotate(12deg); filter: hue-rotate(-12deg); }
+}
+
+/* Soft outer aura that breathes */
+.genkidama-glow {
+    background: radial-gradient(circle,
+            rgba(191, 219, 254, 0.55) 0%,
+            rgba(96, 165, 250, 0.3) 45%,
+            transparent 72%);
+    filter: blur(14px);
+    animation: genkidama-breathe 2.6s ease-in-out infinite alternate;
+    /* Aura intensity tracks the charge level */
+    opacity: calc(0.45 + var(--charge, 0) * 0.55);
+}
+
+@keyframes genkidama-breathe {
+    from { transform: scale(1.05); }
+    to   { transform: scale(1.3); }
+}
+
+/* Thin orbiting ring for a bit of majesty */
+.genkidama-ring {
+    border: 2px solid rgba(219, 234, 254, 0.5);
+    box-shadow: 0 0 22px 6px rgba(147, 197, 253, 0.45);
+    animation: genkidama-ring-spin 7s linear infinite;
+    transform: rotateX(72deg);
+}
+
+@keyframes genkidama-ring-spin {
+    from { transform: rotateX(72deg) rotate(0deg); }
+    to   { transform: rotateX(72deg) rotate(360deg); }
+}
+
+/* Fully charged: hotter and faster churn.
+ * NOTE: the pulse must NOT animate `transform` on .genkidama-sphere — that
+ * property carries the JS-eased --sphere-scale, and an animation would override
+ * it (making the sphere snap to a fixed size). We pulse the inner layers
+ * instead, which are free to use their own transforms. */
+.genkidama-sphere.complete .genkidama-core {
+    animation: genkidama-churn 1.9s ease-in-out infinite alternate,
+               genkidama-complete-pulse 2.2s ease-in-out infinite alternate;
+    box-shadow:
+        0 0 90px 30px rgba(191, 219, 254, 1),
+        0 0 200px 80px rgba(59, 130, 246, 0.8),
+        inset 0 0 70px 18px rgba(255, 255, 255, 0.8);
+}
+
+/* Includes the hue shift from genkidama-churn: both animations target `filter`,
+   and the later one in the list wins, so the values must be combined here. */
+@keyframes genkidama-complete-pulse {
+    from { filter: brightness(1) hue-rotate(0deg); }
+    to   { filter: brightness(1.3) hue-rotate(-12deg); }
+}
+
+/* Final bloom before it fades away. Uses its own animation (not a transition on
+ * the custom property) so the bloom is smooth regardless of the eased scale. */
+.genkidama-sphere.release {
+    animation: genkidama-release 2.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes genkidama-release {
+    0% {
+        transform: translateZ(0) scale(var(--sphere-scale, 0.9));
+        opacity: 1;
+    }
+    35% {
+        transform: translateZ(0) scale(calc(var(--sphere-scale, 0.9) * 1.25));
+        opacity: 1;
+    }
+    100% {
+        transform: translateZ(0) scale(calc(var(--sphere-scale, 0.9) * 1.9));
+        opacity: 0;
+    }
+}
+
+/* ===== Ki motes rising from donors ====================================== */
+.genkidama-mote {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 3;
+    background: radial-gradient(circle,
+            #ffffff 0%,
+            rgba(191, 219, 254, 0.95) 42%,
+            rgba(59, 130, 246, 0) 100%);
+    box-shadow: 0 0 12px 4px rgba(147, 197, 253, 0.85);
+    animation-name: genkidama-mote-rise;
+    animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1);
+    animation-fill-mode: forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes genkidama-mote-rise {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    18% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--tx, 0)), calc(-50% + var(--ty, 0))) scale(0.35);
+    }
+}
+
+/* ===== Backdrop gif ===================================================== */
+/* Same seamless approach as the Konami backdrop: sits above the page
+ * background but below the UI, and the page background is never modified,
+ * so fading out simply reveals the original look. */
+.genkidama-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 2.2s cubic-bezier(0.4, 0, 0.5, 1);
+    animation: genkidama-backdrop-in 1.4s ease-out;
+}
+
+.genkidama-backdrop.fading {
+    opacity: 0;
+}
+
+@keyframes genkidama-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.genkidama-backdrop-img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 100%;
+    min-height: 100%;
+    object-fit: cover;
+    /* Presence grows with the gathered energy (--backdrop-strength 0..1). */
+    opacity: calc(0.2 + var(--backdrop-strength, 1) * 0.28);
+    filter: saturate(1.15) contrast(1.05) brightness(0.85);
+    transition: opacity 1.2s ease-out;
+    animation: genkidama-img-drift 7s ease-in-out infinite alternate;
+}
+
+@keyframes genkidama-img-drift {
+    from { transform: translate(-50%, -50%) scale(1); }
+    to   { transform: translate(-50%, -50%) scale(1.07); }
+}
+
+/* Fade the gif out.
+ * Do NOT touch `animation` or `transform` here: the drift animation is mid-cycle
+ * (somewhere between scale 1 and 1.07), so cancelling it snaps the transform
+ * back to its base value — a visible jolt that looked like the gif resetting or
+ * zooming right before it disappeared. Letting the drift continue and animating
+ * only opacity keeps the exit perfectly smooth. */
+.genkidama-backdrop.fading .genkidama-backdrop-img {
+    opacity: 0;
+    transition: opacity 1.8s ease-in;
+}
+
+/* Lift the UI above the backdrop (stacking only, never the background) */
+body.genkidama-active #login-screen,
+body.genkidama-active #game-screen {
+    position: relative;
+    z-index: 1;
+}
+
+/* ===== Label =========================================================== */
+.genkidama-label {
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9998;
+    pointer-events: none;
+    text-align: center;
+    opacity: 1;
+    transition: opacity 1.2s ease-out;
+    animation: genkidama-label-in 1.4s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.genkidama-label.fading {
+    opacity: 0;
+}
+
+.genkidama-label-title {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(2rem, 7vw, 4.5rem);
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: #fff;
+    text-shadow:
+        0 0 20px rgba(191, 219, 254, 1),
+        0 0 44px rgba(59, 130, 246, 0.95),
+        0 6px 18px rgba(0, 0, 0, 0.85);
+}
+
+.genkidama-label-sub {
+    margin-top: 0.4rem;
+    font-size: clamp(0.8rem, 2.2vw, 1.15rem);
+    letter-spacing: 2px;
+    color: rgba(219, 234, 254, 0.95);
+    text-shadow: 0 0 12px rgba(59, 130, 246, 0.9),
+                 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes genkidama-label-in {
+    0%   { opacity: 0; transform: translate(-50%, 18px) scale(0.85); }
+    55%  { opacity: 1; transform: translate(-50%, 0) scale(1.04); }
+    100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .genkidama-core, .genkidama-glow, .genkidama-ring,
+    .genkidama-sphere.complete, .genkidama-backdrop-img,
+    .hands-raised .dbz-participant-card,
+    .hands-raised .dbz-participant-card::before {
+        animation: none;
+    }
+    .genkidama-mote { display: none; }
+}
+
+/* ===== Tier 3: radiant light flares ===================================== */
+/* The Genkidama radiates pure light in the anime (no electricity), so these are
+   soft tapering beams in the sphere's own blue-white palette. */
+.genkidama-flare {
+    position: fixed;
+    width: 7px;
+    margin-left: -3.5px;
+    pointer-events: none;
+    z-index: 3;
+    transform-origin: top center;
+    background: linear-gradient(180deg,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(219, 234, 254, 0.8) 25%,
+            rgba(147, 197, 253, 0.45) 60%,
+            rgba(59, 130, 246, 0) 100%);
+    filter: blur(2px)
+            drop-shadow(0 0 10px rgba(191, 219, 254, 0.9));
+    opacity: 0;
+    /* --flare-rot must be re-applied in every keyframe, otherwise the scaleY
+       pulse would drop the rotation and every beam would point straight down. */
+    transform: rotate(var(--flare-rot, 0deg)) scaleY(0.2);
+    animation: genkidama-flare-beam 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes genkidama-flare-beam {
+    0% {
+        opacity: 0;
+        transform: rotate(var(--flare-rot, 0deg)) scaleY(0.2);
+    }
+    25% {
+        opacity: 0.95;
+        transform: rotate(var(--flare-rot, 0deg)) scaleY(1);
+    }
+    60% {
+        opacity: 0.7;
+        transform: rotate(var(--flare-rot, 0deg)) scaleY(1.05);
+    }
+    100% {
+        opacity: 0;
+        transform: rotate(var(--flare-rot, 0deg)) scaleY(1.15);
+    }
+}
+
+/* Halo bloom pulsing in sync with the beams */
+.genkidama-halo {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+    margin-left: 0;
+    margin-top: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+    background: radial-gradient(circle,
+            rgba(219, 234, 254, 0.35) 0%,
+            rgba(147, 197, 253, 0.18) 45%,
+            transparent 72%);
+    filter: blur(8px);
+    opacity: 0;
+    animation: genkidama-halo-bloom 1.4s ease-out forwards;
+}
+
+@keyframes genkidama-halo-bloom {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    30%  { opacity: 0.85; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+
+/* ===== Tier 4: orbiting ring (only shown from tier 4) =================== */
+.genkidama-ring {
+    opacity: 0;
+    transition: opacity 1s ease-out;
+}
+
+.genkidama-sphere.show-ring .genkidama-ring {
+    opacity: 1;
+}
+
+/* ===== Tier 5: shockwave pulses + screen rumble ========================= */
+.genkidama-shockwave {
+    position: fixed;
+    width: 140px;
+    height: 140px;
+    margin-left: -70px;
+    margin-top: -70px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+    border: 3px solid rgba(191, 219, 254, 0.8);
+    box-shadow: 0 0 28px 8px rgba(96, 165, 250, 0.5);
+    animation: genkidama-shockwave-expand 1.5s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+}
+
+@keyframes genkidama-shockwave-expand {
+    0%   { transform: scale(0.35); opacity: 0.9; border-width: 5px; }
+    70%  { opacity: 0.35; }
+    100% { transform: scale(4.2); opacity: 0; border-width: 1px; }
+}
+
+/* Subtle, continuous rumble applied to the game screen (never <body>, which
+   would become the containing block for our fixed-position effects). */
+body.genkidama-rumble #game-screen {
+    animation: genkidama-rumble-anim 0.18s ease-in-out infinite;
+}
+
+@keyframes genkidama-rumble-anim {
+    0%, 100% { transform: translate(0, 0); }
+    25%      { transform: translate(-1.5px, 1px); }
+    75%      { transform: translate(1.5px, -1px); }
+}
+
+/* ===== Tier unlock feedback ============================================= */
+.genkidama-tier-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 22%,
+            rgba(219, 234, 254, 0.45) 0%,
+            rgba(147, 197, 253, 0.2) 35%,
+            transparent 70%);
+    animation: genkidama-tier-flash-anim 0.75s ease-out forwards;
+}
+
+@keyframes genkidama-tier-flash-anim {
+    0%   { opacity: 0.9; }
+    100% { opacity: 0; }
+}
+
+/* Sphere gives a quick extra swell when a tier is unlocked. Applied to the core
+   so it doesn't fight the JS-eased scale on the sphere itself. */
+.genkidama-sphere.tier-pop .genkidama-core {
+    animation: genkidama-tier-pop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes genkidama-tier-pop {
+    0%   { transform: scale(1); filter: brightness(1); }
+    40%  { transform: scale(1.18); filter: brightness(1.7); }
+    100% { transform: scale(1); filter: brightness(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .genkidama-flare, .genkidama-halo, .genkidama-shockwave,
+    .genkidama-tier-flash {
+        display: none;
+    }
+    body.genkidama-rumble #game-screen { animation: none; }
+    .genkidama-sphere.tier-pop .genkidama-core { animation: none; }
+}

@@ -108,19 +108,44 @@ document.addEventListener('DOMContentLoaded', () => {
         setSoundEnabled: (v) => { soundEnabled = v; }
     });
 
+    // Exposed so easter-eggs.js can trigger the transformation locally when
+    // there's no socket (offline / not joined yet).
+    window.SPP.avatarEffectsInstance = avatarEffects;
+
     // Grab & throw physics for avatars - extracted to user-grab.js
     const userGrab = window.SPP.userGrab
         ? window.SPP.userGrab.create({ isSoundEnabled: () => soundEnabled })
+        : null;
+
+    // Genkidama ritual (collective hands-to-the-sky moment)
+    const genkidama = window.SPP.genkidama
+        ? window.SPP.genkidama.create({ isSoundEnabled: () => soundEnabled })
         : null;
 
     // Hand-gesture control (webcam) - extracted to hand-control.js. Opt-in, default OFF.
     const handControlToggle = document.getElementById('hand-control-toggle');
     if (window.SPP.handControl && handControlToggle) {
         const handControl = window.SPP.handControl.create({
-            onStart: () => handControlToggle.classList.add('active'),
+            onStart: () => {
+                handControlToggle.classList.add('active');
+                // Let everyone know this user is on webcam hand mode, so their
+                // avatar can show the indicator.
+                if (socket && sessionId) {
+                    socket.emit('hand-mode', { sessionId, enabled: true });
+                }
+            },
             onStop: () => {
                 handControlToggle.classList.remove('active');
                 if (userGrab) userGrab.cancelAll();
+                if (socket && sessionId) {
+                    socket.emit('hand-mode', { sessionId, enabled: false });
+                }
+            },
+            // Genkidama ritual: how many arms (0, 1 or 2) are raised to the sky.
+            onHandsRaised: (count) => {
+                if (socket && sessionId) {
+                    socket.emit('hands-raised', { sessionId, hands: count });
+                }
             },
             // Grab & throw: the server validates and broadcasts, so everyone
             // sees the same thing and abuse rules are enforced centrally.
@@ -562,7 +587,8 @@ document.addEventListener('DOMContentLoaded', () => {
             animateSmoothPunchBroadcast,
             showReconnectNotification,
             updateConnectionStatus,
-            getUserGrab: () => userGrab
+            getUserGrab: () => userGrab,
+            getGenkidama: () => genkidama
         });
     }
 
@@ -686,6 +712,13 @@ document.addEventListener('DOMContentLoaded', () => {
             participantEl.style.left = `${x}px`;
             participantEl.style.top = `${y}px`;
             participantEl.setAttribute('data-user-id', id);
+
+            // Re-apply webcam hand-mode / hands-raised indicators, which would
+            // otherwise be lost every time the list is re-rendered.
+            if (participant.handMode) participantEl.classList.add('hand-mode-on');
+            if (participant.handsRaised) participantEl.classList.add('hands-raised');
+            if ((participant.raisedHands || 0) === 1) participantEl.classList.add('one-arm');
+            if ((participant.raisedHands || 0) >= 2) participantEl.classList.add('both-arms');
 
             // Add click event for collision animation (only for other users)
             if (id !== socket.id) {

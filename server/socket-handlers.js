@@ -34,6 +34,9 @@ function registerSocketHandlers(io) {
         socket.on('send-emoji', (data) => handleSendEmoji(io, socket, data));
         socket.on('update-avatar', (data) => handleUpdateAvatar(io, socket, data));
         socket.on('super-saiyan', (data) => handleSuperSaiyan(io, data));
+        socket.on('konami', (data) => handleKonami(io, socket, data));
+        socket.on('hand-mode', (data) => handleHandMode(io, socket, data));
+        socket.on('hands-raised', (data) => handleHandsRaised(io, socket, data));
         socket.on('kamehameha', (data) => handleKamehameha(io, socket, data));
         socket.on('user-collision', (data) => handleUserCollision(io, socket, data));
         socket.on('toggle-spectator', (data) => handleToggleSpectator(io, socket, data));
@@ -380,6 +383,153 @@ function handleUpdateAvatar(io, socket, data) {
     } catch (error) {
         console.error('Error updating avatar:', error);
         socket.emit('error', { message: 'Failed to update avatar' });
+    }
+}
+
+// --- Genkidama ritual -------------------------------------------------------
+// Users running the webcam hand-control mode can raise both hands to the sky to
+// donate energy. When EVERY hand-mode user in the session is donating (min 2),
+// the Genkidama fires for everyone. Purely ceremonial: it changes no game state.
+// Minimum donors for the real ritual. Set SPP_GENKIDAMA_SOLO=1 when running
+// locally to allow testing it with a single user.
+const GENKIDAMA_MIN_PARTICIPANTS = process.env.SPP_GENKIDAMA_SOLO === '1' ? 1 : 2;
+// The sphere (and the Goku backdrop) only appear from this many donors up.
+// Below it, a lone donor just produces rising energy — subtle on purpose.
+const GENKIDAMA_SPHERE_MIN_DONORS = process.env.SPP_GENKIDAMA_SOLO === '1' ? 1 : 2;
+const GENKIDAMA_COOLDOWN_MS = 30_000;
+const genkidamaLastFired = new Map(); // sessionId -> timestamp
+
+/** Broadcasts that a user turned webcam hand mode on/off. */
+function handleHandMode(io, socket, data) {
+    try {
+        const { sessionId, enabled } = data || {};
+        const session = sessions[sessionId];
+        if (!session || !session.users[socket.id]) return;
+
+        session.users[socket.id].handMode = !!enabled;
+        if (!enabled) session.users[socket.id].handsRaised = false;
+
+        io.to(sessionId).emit('hand-mode-updated', {
+            userId: socket.id,
+            enabled: !!enabled
+        });
+
+        if (!enabled) {
+            io.to(sessionId).emit('hands-raised-updated', {
+                userId: socket.id,
+                raised: false
+            });
+            evaluateGenkidama(io, sessionId);
+        }
+    } catch (error) {
+        console.error('Error in hand-mode:', error);
+    }
+}
+
+/**
+ * Broadcasts how many arms (0, 1 or 2) a user is raising, then re-evaluates the
+ * ritual. Two arms donate twice the energy of one.
+ */
+function handleHandsRaised(io, socket, data) {
+    try {
+        const { sessionId, hands, raised } = data || {};
+        const session = sessions[sessionId];
+        if (!session || !session.users[socket.id]) return;
+        // Only meaningful for users actually running hand mode.
+        if (!session.users[socket.id].handMode) return;
+
+        // Accept both the arm count and the legacy boolean.
+        let count = Number.isFinite(Number(hands)) ? Math.round(Number(hands)) : (raised ? 1 : 0);
+        count = Math.max(0, Math.min(2, count));
+
+        if (session.users[socket.id].raisedHands === count) return;
+        session.users[socket.id].raisedHands = count;
+        session.users[socket.id].handsRaised = count > 0;
+
+        io.to(sessionId).emit('hands-raised-updated', {
+            userId: socket.id,
+            raised: count > 0,
+            hands: count
+        });
+
+        evaluateGenkidama(io, sessionId);
+    } catch (error) {
+        console.error('Error in hands-raised:', error);
+    }
+}
+
+/**
+ * Emits the charge progress and, once every hand-mode user is donating,
+ * triggers the Genkidama for the whole session.
+ */
+function evaluateGenkidama(io, sessionId) {
+    const session = sessions[sessionId];
+    if (!session) return;
+
+    const handModeUsers = Object.values(session.users)
+        .filter((u) => u && u.isConnected && u.handMode);
+    const donors = handModeUsers.filter((u) => (u.raisedHands || 0) > 0);
+
+    // Energy is per-arm: raising both arms donates twice as much. Max possible
+    // is everyone in hand mode raising both arms.
+    const arms = donors.reduce((sum, u) => sum + (u.raisedHands || 0), 0);
+    const maxArms = handModeUsers.length * 2;
+
+    io.to(sessionId).emit('genkidama-progress', {
+        donors: donors.length,
+        total: handModeUsers.length,
+        arms,
+        maxArms,
+        // The sphere only becomes visible once at least 2 people are donating.
+        // With a single donor you just see energy rising, which is meant to
+        // pique curiosity and invite others to join in.
+        sphereVisible: donors.length >= GENKIDAMA_SPHERE_MIN_DONORS,
+        donorIds: donors.map((u) => u.id),
+        donorArms: donors.map((u) => ({ id: u.id, hands: u.raisedHands || 0 }))
+    });
+
+    if (handModeUsers.length < GENKIDAMA_MIN_PARTICIPANTS) return;
+    // Everyone must be donating, and with BOTH arms, to complete the ritual.
+    if (donors.length !== handModeUsers.length) return;
+    if (arms !== maxArms) return;
+
+    const now = Date.now();
+    const last = genkidamaLastFired.get(sessionId) || 0;
+    if (now - last < GENKIDAMA_COOLDOWN_MS) return;
+    genkidamaLastFired.set(sessionId, now);
+
+    console.log(`Genkidama fired in session ${sessionId} with ${donors.length} donors`);
+    io.to(sessionId).emit('genkidama-fired', {
+        donors: donors.length,
+        donorNames: donors.map((u) => sanitizeInput(u.name || 'Someone'))
+    });
+}
+
+// Konami code: full-screen SSJ2 transformation broadcast to the whole session.
+// Rate limited so it can't be spammed at everyone.
+const konamiCooldowns = new Map();
+const KONAMI_COOLDOWN_MS = 12_000;
+
+function handleKonami(io, socket, data) {
+    try {
+        const { sessionId } = data || {};
+        const session = sessions[sessionId];
+        if (!session || !session.users[socket.id]) return;
+
+        const now = Date.now();
+        const last = konamiCooldowns.get(socket.id) || 0;
+        if (now - last < KONAMI_COOLDOWN_MS) return;
+        konamiCooldowns.set(socket.id, now);
+
+        const fromName = sanitizeInput(session.users[socket.id].name || 'Someone');
+        console.log(`Konami code activated by ${fromName} in session ${sessionId}`);
+
+        io.to(sessionId).emit('konami-activated', {
+            userId: socket.id,
+            fromName
+        });
+    } catch (error) {
+        console.error('Error in konami:', error);
     }
 }
 

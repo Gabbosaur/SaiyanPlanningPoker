@@ -4,9 +4,9 @@
     top: 50%;
     left: -40%;
     width: 60%;
-    height: 45vh;
-    min-height: 280px;
-    max-height: 520px;
+    height: 58vh;
+    min-height: 340px;
+    max-height: 680px;
     transform: translateY(-50%);
     pointer-events: none;
     z-index: 9999;
@@ -20,9 +20,10 @@
         transparent 100%);
     filter:
         blur(3px)
-        drop-shadow(0 0 60px rgba(147, 197, 253, 1))
-        drop-shadow(0 0 120px rgba(59, 130, 246, 0.85))
-        drop-shadow(0 0 200px rgba(29, 78, 216, 0.5));
+        drop-shadow(0 0 80px rgba(255, 255, 255, 0.95))
+        drop-shadow(0 0 140px rgba(147, 197, 253, 1))
+        drop-shadow(0 0 240px rgba(59, 130, 246, 0.9))
+        drop-shadow(0 0 340px rgba(29, 78, 216, 0.55));
     animation: kamehameha-travel 1.6s cubic-bezier(0.45, 0, 0.3, 1) forwards;
     will-change: transform, opacity, left, width;
     opacity: 0;
@@ -310,4 +311,406 @@ body.kamehameha-stunned [data-user-id] .dbz-participant-card {
     0%, 100% { transform: rotate(0deg); }
     25%      { transform: rotate(-3deg); }
     75%      { transform: rotate(3deg); }
+}
+
+/* --- Konami code reward: SSJ2 background takeover ----------------------- */
+/* Sits between the page background and the UI: z-index 0 paints above the body
+ * gradient, while the app content is lifted to z-index 1 for the duration (see
+ * .konami-active below). The body background is never modified, so when the
+ * backdrop fades out the original background is simply revealed again —
+ * no hard cut, fully seamless. */
+.konami-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 45%,
+            rgba(255, 220, 90, 0.25) 0%,
+            rgba(255, 150, 20, 0.18) 35%,
+            rgba(0, 0, 0, 0.55) 100%);
+    animation: konami-backdrop-in 0.6s ease-out;
+    opacity: 1;
+    /* Long, eased fade so the original background returns gradually. */
+    transition: opacity 1.8s cubic-bezier(0.4, 0, 0.5, 1);
+}
+
+.konami-backdrop.fading {
+    opacity: 0;
+}
+
+/* Fade the gif out. Same reasoning as the Genkidama backdrop: cancelling the
+ * pulse animation mid-cycle snaps the transform back to its base value, which
+ * reads as a jolt/zoom right before the gif disappears. Animate opacity only. */
+.konami-backdrop.fading .konami-backdrop-img {
+    opacity: 0;
+    transition: opacity 1.5s ease-in;
+}
+
+.konami-backdrop-img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 100%;
+    min-height: 100%;
+    object-fit: cover;
+    /* Let the UI stay readable on top of the gif */
+    opacity: 0.55;
+    filter: saturate(1.2) contrast(1.05);
+    animation: konami-img-pulse 2.4s ease-in-out infinite alternate;
+    /* JS holds opacity at 0 until the gif is decoded, then clears the inline
+       value; this makes that reveal a soft fade instead of a pop. */
+    transition: opacity 0.5s ease-out;
+}
+
+@keyframes konami-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes konami-img-pulse {
+    from { transform: translate(-50%, -50%) scale(1); }
+    to   { transform: translate(-50%, -50%) scale(1.06); }
+}
+
+/* Golden aura flash over the whole page as the code lands */
+.konami-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%,
+            rgba(255, 255, 255, 0.5) 0%,
+            rgba(255, 210, 60, 0.25) 30%,
+            transparent 70%);
+    animation: konami-flash 0.8s ease-out forwards;
+}
+
+@keyframes konami-flash {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Lift the UI above the backdrop so it stays visible and usable while the gif
+ * plays underneath. Only stacking is touched — never the background itself —
+ * so removing this class can't cause a visible flash. */
+body.konami-active #login-screen,
+body.konami-active #game-screen {
+    position: relative;
+    z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .konami-backdrop-img { animation: none; }
+    .konami-backdrop::after { animation: none; opacity: 0; }
+}
+
+/* --- Konami explosion: flash, shockwaves, motes, lightning, shake -------- */
+
+/* Full-screen white flash at the moment of activation */
+.konami-flash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9997;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 50%,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(255, 240, 170, 0.75) 35%,
+            rgba(255, 190, 40, 0.35) 65%,
+            transparent 100%);
+    animation: konami-screen-flash 0.7s ease-out forwards;
+}
+
+@keyframes konami-screen-flash {
+    0%   { opacity: 1; }
+    25%  { opacity: 0.75; }
+    100% { opacity: 0; }
+}
+
+/* Expanding golden shockwave rings */
+.konami-shockwave {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 120px;
+    height: 120px;
+    margin-left: -60px;
+    margin-top: -60px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9996;
+    border: 6px solid rgba(255, 225, 120, 0.95);
+    box-shadow:
+        0 0 40px 12px rgba(255, 200, 60, 0.75),
+        inset 0 0 30px 8px rgba(255, 240, 180, 0.55);
+    animation: konami-shockwave-expand 1.3s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes konami-shockwave-expand {
+    0% {
+        transform: scale(0.15);
+        opacity: 1;
+        border-width: 10px;
+    }
+    70% {
+        opacity: 0.55;
+    }
+    100% {
+        /* Big enough to sweep past the screen edges on any aspect ratio */
+        transform: scale(26);
+        opacity: 0;
+        border-width: 1px;
+    }
+}
+
+/* Ki motes blasted outward from the centre */
+.konami-mote {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9996;
+    background: radial-gradient(circle,
+            #fff 0%,
+            rgba(255, 235, 150, 0.95) 45%,
+            rgba(255, 170, 30, 0) 100%);
+    box-shadow: 0 0 12px 4px rgba(255, 205, 80, 0.8);
+    animation: konami-mote-fly 1.1s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes konami-mote-fly {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--mx, 0)), calc(-50% + var(--my, 0))) scale(0.25);
+    }
+}
+
+/* Konami lightning bolts: brighter/thicker than the ambient streak sparks,
+   and raised above the backdrop so they read clearly.
+   NOTE: the base .ssj2-spark animation animates `transform: scaleY(...)`, which
+   would wipe out the per-segment rotation set inline (making every bolt
+   vertical). We use a dedicated animation that keeps the rotation by reading it
+   from the --bolt-rot custom property. */
+.ssj2-spark.konami-bolt {
+    z-index: 9995;
+    width: 4px;
+    filter: drop-shadow(0 0 8px rgba(190, 240, 255, 0.95))
+            drop-shadow(0 0 18px rgba(90, 190, 255, 0.7));
+    transform: rotate(var(--bolt-rot, 0rad)) scaleY(0.3);
+    animation: konami-bolt-flash 0.5s ease-out forwards;
+}
+
+@keyframes konami-bolt-flash {
+    0%   { opacity: 0; transform: rotate(var(--bolt-rot, 0rad)) scaleY(0.3); }
+    18%  { opacity: 1; transform: rotate(var(--bolt-rot, 0rad)) scaleY(1); }
+    65%  { opacity: 1; transform: rotate(var(--bolt-rot, 0rad)) scaleY(1); }
+    100% { opacity: 0; transform: rotate(var(--bolt-rot, 0rad)) scaleY(0.75); }
+}
+
+/* Announcement label */
+.konami-label {
+    position: fixed;
+    top: 16%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(1.3rem, 4.5vw, 2.8rem);
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-align: center;
+    white-space: nowrap;
+    color: #fff;
+    z-index: 9998;
+    pointer-events: none;
+    text-shadow:
+        0 0 14px rgba(255, 225, 100, 1),
+        0 0 30px rgba(255, 170, 20, 0.9),
+        0 4px 12px rgba(0, 0, 0, 0.85);
+    animation: konami-label-anim 3s ease-out forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes konami-label-anim {
+    0%   { transform: translate(-50%, -24px) scale(0.5); opacity: 0; }
+    10%  { transform: translate(-50%, 0) scale(1.15); opacity: 1; }
+    18%  { transform: translate(-50%, 0) scale(1); opacity: 1; }
+    82%  { opacity: 1; }
+    100% { transform: translate(-50%, -20px) scale(1); opacity: 0; }
+}
+
+/* Screen shake (applied to #game-screen, never body) */
+.konami-shake {
+    animation: konami-shake-anim 0.11s ease-in-out 9;
+}
+
+@keyframes konami-shake-anim {
+    0%, 100% { transform: translate(0, 0); }
+    25%      { transform: translate(-7px, 4px); }
+    50%      { transform: translate(6px, -5px); }
+    75%      { transform: translate(-4px, -3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .konami-shockwave, .konami-mote, .konami-flash-screen,
+    .ssj2-spark.konami-bolt {
+        display: none;
+    }
+    .konami-shake { animation: none; }
+}
+
+/* ===== Kamehameha: beefed-up charge & fire ============================== */
+
+/* --- Charge: ki being sucked INTO the orb -------------------------------- */
+.kameha-inflow {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9994;
+    background: radial-gradient(circle,
+            #fff 0%,
+            rgba(191, 219, 254, 0.95) 40%,
+            rgba(59, 130, 246, 0) 100%);
+    box-shadow: 0 0 10px 3px rgba(147, 197, 253, 0.85);
+    animation: kameha-inflow-suck 0.75s ease-in forwards;
+    will-change: transform, opacity;
+}
+
+/* Travels from the rim (--fx/--fy) inward to the charge point. */
+@keyframes kameha-inflow-suck {
+    0% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--fx, 0)), calc(-50% + var(--fy, 0))) scale(1.1);
+    }
+    20% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.2);
+    }
+}
+
+/* --- Electric arcs around the orb / along the beam ---------------------- */
+/* Same trick as the konami bolts: keep rotation in a custom property so the
+   scaleY pulse in the keyframes can't wipe it out. */
+.ssj2-spark.kameha-arc {
+    z-index: 9995;
+    width: 3px;
+    filter: drop-shadow(0 0 7px rgba(200, 235, 255, 0.95))
+            drop-shadow(0 0 16px rgba(59, 130, 246, 0.8));
+    transform: rotate(var(--bolt-rot, 0rad)) scaleY(0.3);
+    animation: kameha-arc-flash 0.45s ease-out forwards;
+}
+
+@keyframes kameha-arc-flash {
+    0%   { opacity: 0; transform: rotate(var(--bolt-rot, 0rad)) scaleY(0.3); }
+    20%  { opacity: 1; transform: rotate(var(--bolt-rot, 0rad)) scaleY(1); }
+    65%  { opacity: 1; transform: rotate(var(--bolt-rot, 0rad)) scaleY(1); }
+    100% { opacity: 0; transform: rotate(var(--bolt-rot, 0rad)) scaleY(0.7); }
+}
+
+/* --- Charge rumble (intensifies per stage) ------------------------------- */
+.kamehameha-rumble-1 { animation: kameha-rumble-1 0.09s ease-in-out 12; }
+.kamehameha-rumble-2 { animation: kameha-rumble-2 0.08s ease-in-out 14; }
+.kamehameha-rumble-3 { animation: kameha-rumble-3 0.07s ease-in-out 16; }
+
+@keyframes kameha-rumble-1 {
+    0%, 100% { transform: translate(0, 0); }
+    50%      { transform: translate(-1.5px, 1px); }
+}
+
+@keyframes kameha-rumble-2 {
+    0%, 100% { transform: translate(0, 0); }
+    33%      { transform: translate(-3px, 2px); }
+    66%      { transform: translate(2px, -2px); }
+}
+
+@keyframes kameha-rumble-3 {
+    0%, 100% { transform: translate(0, 0); }
+    25%      { transform: translate(-5px, 3px); }
+    50%      { transform: translate(4px, -3px); }
+    75%      { transform: translate(-3px, -2px); }
+}
+
+/* --- Fire: blinding flash ----------------------------------------------- */
+.kameha-fire-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 9997;
+    pointer-events: none;
+    background: radial-gradient(circle at 10% 50%,
+            rgba(255, 255, 255, 0.98) 0%,
+            rgba(219, 234, 254, 0.8) 28%,
+            rgba(96, 165, 250, 0.4) 55%,
+            transparent 85%);
+    animation: kameha-fire-flash-anim 0.8s ease-out forwards;
+}
+
+@keyframes kameha-fire-flash-anim {
+    0%   { opacity: 1; }
+    30%  { opacity: 0.7; }
+    100% { opacity: 0; }
+}
+
+/* --- Fire: muzzle shockwave rings --------------------------------------- */
+.kameha-shockwave {
+    position: fixed;
+    width: 100px;
+    height: 100px;
+    margin-left: -50px;
+    margin-top: -50px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9996;
+    border: 5px solid rgba(191, 219, 254, 0.95);
+    box-shadow:
+        0 0 36px 10px rgba(96, 165, 250, 0.7),
+        inset 0 0 26px 6px rgba(219, 234, 254, 0.5);
+    animation: kameha-shockwave-expand 1.2s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes kameha-shockwave-expand {
+    0%   { transform: scale(0.15); opacity: 1; border-width: 9px; }
+    70%  { opacity: 0.5; }
+    100% { transform: scale(22); opacity: 0; border-width: 1px; }
+}
+
+/* --- Fire: recoil debris ------------------------------------------------ */
+.kameha-debris {
+    position: fixed;
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 9996;
+    background: linear-gradient(135deg, #fff 0%, #bfdbfe 50%, #3b82f6 100%);
+    box-shadow: 0 0 9px 3px rgba(147, 197, 253, 0.8);
+    animation: kameha-debris-fly 0.95s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes kameha-debris-fly {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(0deg) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--dx, 0)), calc(-50% + var(--dy, 0)))
+                   rotate(540deg) scale(0.25);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kameha-inflow, .kameha-shockwave, .kameha-debris,
+    .kameha-fire-flash, .ssj2-spark.kameha-arc {
+        display: none;
+    }
+    .kamehameha-rumble-1, .kamehameha-rumble-2, .kamehameha-rumble-3 {
+        animation: none;
+    }
 }

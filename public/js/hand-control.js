@@ -26,6 +26,11 @@
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
     const HAND_MODEL_URL =
         'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+    // Pose model, used ONLY for the Genkidama raise detection. The hand model
+    // can't help there: when you lift your arms the hands leave the frame of a
+    // laptop webcam, so we look at shoulders/elbows instead, which stay visible.
+    const POSE_MODEL_URL =
+        'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
     const WASM_ROOT = MEDIAPIPE_VISION_CDN + '/wasm';
 
     // --- Tuning constants ------------------------------------------------
@@ -121,6 +126,41 @@
     // Velocity used for the throw is measured over this window.
     const FLICK_SAMPLE_MS = 120;
 
+    // --- Genkidama: arm raised to the sky ---------------------------------
+    // Primary signal is the POSE model: an arm counts as raised when its wrist
+    // (or, if the wrist is out of frame, its elbow) is above the shoulder.
+    // Normalised coords: y grows downward, so "above" means a SMALLER y.
+    //
+    // This works while seated at a laptop, where raising your arms pushes the
+    // hands out of frame entirely — the shoulders and elbows stay visible.
+    // How far above the shoulder a joint must sit to count as raised, expressed
+    // as a fraction of the person's own torso length (shoulder -> hip). Using a
+    // body-relative measure instead of a fixed offset makes it work at any
+    // distance from the camera and for any build.
+    //
+    // A hand resting on your head clears the shoulder by only a little, so a
+    // small margin produced false positives. Requiring a clearly *extended* arm
+    // removes those.
+    const RAISE_WRIST_TORSO_RATIO = 0.55;   // wrist well above the shoulder
+    const RAISE_ELBOW_TORSO_RATIO = 0.16;   // elbow lifted above shoulder level
+    // Fallback margin if the torso can't be measured (hips out of frame).
+    const RAISE_SHOULDER_MARGIN = 0.18;
+    // Landmarks are unreliable below this visibility score.
+    const POSE_MIN_VISIBILITY = 0.5;
+    // Fallback (hand model) threshold, used only when pose isn't available.
+    const RAISE_MAX_Y = 0.45;
+    // Pose inference is costlier than hand tracking, so throttle it. ~10/sec is
+    // plenty for detecting a held pose.
+    const POSE_INTERVAL_MS = 100;
+    // The hand must be open (few curled fingers) to count as donating energy.
+    const RAISE_MAX_CURLED = 1;
+    // Must hold the pose this long before it counts. Deliberately generous:
+    // donating energy is a sustained gesture, and the delay filters out arms
+    // that merely pass through the zone (stretching, scratching your head...).
+    const RAISE_HOLD_MS = 1200;
+    // And must be released for this long before we report lowering (hysteresis).
+    const RAISE_RELEASE_MS = 500;
+
     /**
      * @param {Object} deps
      * @param {() => void} [deps.onStart]
@@ -133,6 +173,11 @@
         let starting = false;
 
         let handLandmarker = null;
+        let poseLandmarker = null;
+        // Pose is heavier than hand tracking, so it runs at a lower rate and the
+        // last result is reused between runs.
+        let latestPose = null;
+        let lastPoseAt = 0;
         let video = null;
         let rafId = null;
 
@@ -167,6 +212,12 @@
         // engaged. A click requires this rising edge, so arriving at a target
         // with the hand already closed/pinched never fires a click.
         let gestureJustClosed = false;
+
+        // Genkidama: how many hands are raised (0, 1 or 2), debounced.
+        let raisedCount = 0;
+        // Per-count pose timers so 1->2 and 2->1 transitions are also debounced.
+        let posePendingCount = 0;
+        let posePendingSince = 0;
 
         // Rolling history of the curled-finger count, median-filtered to ride
         // out the landmark noise caused by wrist rotation.
@@ -391,6 +442,19 @@
             if (text) statusText.textContent = text;
         }
 
+        /**
+         * Shows the live raise-detection values in the cam panel hint, so the
+         * thresholds can be tuned against what the camera actually sees.
+         */
+        function setRaiseDebug(count, usingPose) {
+            const hintEl = camPanel && camPanel.querySelector('#hand-cam-hint');
+            if (!hintEl) return;
+            const src = usingPose ? 'pose' : 'hand';
+            hintEl.textContent = count > 0
+                ? `braccia alzate: ${count} (${src})`
+                : 'pugno = click 👊';
+        }
+
         // ------------------------------------------------------------------
         // MediaPipe loading
         // ------------------------------------------------------------------
@@ -405,9 +469,35 @@
             handLandmarker = await HandLandmarker.createFromOptions(fileset, {
                 baseOptions: { modelAssetPath: HAND_MODEL_URL, delegate: 'GPU' },
                 runningMode: 'VIDEO',
-                numHands: 1
+                // Two hands: one drives the pointer, but the Genkidama ritual
+                // needs to know whether you raised one arm or both.
+                numHands: 2
             });
             return handLandmarker;
+        }
+
+        /**
+         * Loads the pose model used for arm-raise detection. Kept separate and
+         * non-fatal: if it fails we simply fall back to the hand-based check.
+         */
+        async function loadPoseLandmarker() {
+            if (poseLandmarker) return poseLandmarker;
+            try {
+                const vision = await import(
+                    /* @vite-ignore */ MEDIAPIPE_VISION_CDN + '/vision_bundle.mjs'
+                );
+                const { PoseLandmarker, FilesetResolver } = vision;
+                const fileset = await FilesetResolver.forVisionTasks(WASM_ROOT);
+                poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
+                    baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' },
+                    runningMode: 'VIDEO',
+                    numPoses: 1
+                });
+            } catch (err) {
+                console.warn('Pose model unavailable, falling back to hand-only raise detection:', err);
+                poseLandmarker = null;
+            }
+            return poseLandmarker;
         }
 
         // ------------------------------------------------------------------
@@ -538,15 +628,33 @@
 
             if (!video || video.readyState < 2) return;
 
+            const ts = performance.now();
+
             let result;
             try {
-                result = handLandmarker.detectForVideo(video, performance.now());
+                result = handLandmarker.detectForVideo(video, ts);
             } catch (e) {
                 return;
             }
 
             const now = performance.now();
             const hands = result && result.landmarks;
+
+            // Pose runs on its own cadence (it's heavier than hand tracking) and
+            // INDEPENDENTLY of whether hands are visible — that's the whole point:
+            // raised arms push the hands out of a laptop webcam's frame.
+            if (poseLandmarker && now - lastPoseAt >= POSE_INTERVAL_MS) {
+                lastPoseAt = now;
+                try {
+                    const poseResult = poseLandmarker.detectForVideo(video, ts + 1);
+                    latestPose = (poseResult && poseResult.landmarks && poseResult.landmarks[0]) || null;
+                } catch (e) {
+                    // Non-fatal: keep the previous pose rather than dropping it.
+                }
+            }
+
+            // Arm-raise detection must run even with no hands in frame.
+            updateHandRaised(hands || [], latestPose, now);
 
             if (!hands || hands.length === 0) {
                 // Be more patient while holding someone: fast wrist rotation can
@@ -641,6 +749,8 @@
 
                 updateGestureState(curled >= FIST_CLOSE, looksOpen, now);
             }
+
+
 
             updateMagnet(smoothX, smoothY);
             updateTarget(smoothX, smoothY, now);
@@ -913,6 +1023,116 @@
         }
 
         // ------------------------------------------------------------------
+        // Genkidama: open hand raised to the sky
+        // ------------------------------------------------------------------
+        /**
+         * Detects the "donating energy" pose: an OPEN hand held high in frame.
+         * Debounced in both directions so brief noise doesn't toggle it, and
+         * ignored entirely while grabbing someone.
+         */
+        /**
+         * Counts raised arms from pose landmarks (0, 1 or 2).
+         *
+         * An arm is raised when its wrist is clearly above its shoulder. If the
+         * wrist has left the frame (common at a laptop: lifting your arms puts
+         * the hands outside the view), we fall back to the ELBOW, which stays
+         * visible and is enough to tell a raised arm from a resting one.
+         *
+         * MediaPipe pose indices: 11/12 shoulders, 13/14 elbows, 15/16 wrists
+         * (left/right).
+         */
+        function countRaisedArmsFromPose(lm) {
+            const visible = (p) => p && (p.visibility === undefined || p.visibility >= POSE_MIN_VISIBILITY);
+
+            // Torso length gives us a body-relative unit, so thresholds hold at
+            // any distance from the camera. Hips are 23/24.
+            const shoulderMidY = (lm[11] && lm[12]) ? (lm[11].y + lm[12].y) / 2 : null;
+            const hipMidY = (lm[23] && lm[24]) ? (lm[23].y + lm[24].y) / 2 : null;
+            let torso = null;
+            if (shoulderMidY !== null && hipMidY !== null
+                && visible(lm[23]) && visible(lm[24])) {
+                torso = Math.abs(hipMidY - shoulderMidY);
+            }
+            if (!torso || torso < 0.05) torso = null; // implausible, ignore
+
+            const arms = [
+                { shoulder: lm[11], elbow: lm[13], wrist: lm[15] }, // left
+                { shoulder: lm[12], elbow: lm[14], wrist: lm[16] }  // right
+            ];
+
+            let count = 0;
+            for (const { shoulder, elbow, wrist } of arms) {
+                if (!visible(shoulder)) continue;
+
+                const wristLimit = torso
+                    ? shoulder.y - torso * RAISE_WRIST_TORSO_RATIO
+                    : shoulder.y - RAISE_SHOULDER_MARGIN;
+                const elbowLimit = torso
+                    ? shoulder.y - torso * RAISE_ELBOW_TORSO_RATIO
+                    : shoulder.y - RAISE_SHOULDER_MARGIN * 0.5;
+
+                if (visible(wrist)) {
+                    // Wrist high AND the arm actually extended upward (elbow at
+                    // or above shoulder level). A hand resting on your head has a
+                    // high-ish wrist but a dropped elbow, so it's excluded.
+                    const elbowOk = !visible(elbow) || elbow.y < shoulder.y;
+                    if (wrist.y < wristLimit && elbowOk) count++;
+                    continue;
+                }
+
+                // Wrist out of frame (normal when arms are fully up): the elbow
+                // must be clearly lifted above the shoulder.
+                if (visible(elbow) && elbow.y < elbowLimit) count++;
+            }
+            return count;
+        }
+
+        function updateHandRaised(hands, poseLandmarks, now) {
+            let count = 0;
+
+            if (!grabTargetId) {
+                if (poseLandmarks && poseLandmarks.length) {
+                    count = countRaisedArmsFromPose(poseLandmarks);
+                } else if (!poseLandmarker) {
+                    // Fallback only when the pose model genuinely isn't available:
+                    // judge from the hands (works only while they stay in frame).
+                    for (const lm of hands) {
+                        if (lm[0].y < RAISE_MAX_Y
+                            && countCurledFingers(lm) <= RAISE_MAX_CURLED) count++;
+                    }
+                } else {
+                    // Pose model exists but hasn't produced a result yet: keep the
+                    // current state rather than reporting a spurious 0.
+                    return;
+                }
+            }
+
+            // Live readout in the cam panel so the detection can be judged.
+            setRaiseDebug(count, !!poseLandmarks);
+
+            if (count === raisedCount) {
+                posePendingCount = count;
+                posePendingSince = 0;
+                return;
+            }
+
+            // Debounce every transition. Raising needs a deliberate hold;
+            // lowering is quicker so it feels responsive.
+            if (posePendingCount !== count) {
+                posePendingCount = count;
+                posePendingSince = now;
+                return;
+            }
+
+            const needed = count > raisedCount ? RAISE_HOLD_MS : RAISE_RELEASE_MS;
+            if (now - posePendingSince >= needed) {
+                raisedCount = count;
+                posePendingSince = 0;
+                if (deps.onHandsRaised) deps.onHandsRaised(raisedCount);
+            }
+        }
+
+        // ------------------------------------------------------------------
         // Grab & throw an avatar
         // ------------------------------------------------------------------
         function startGrab(el) {
@@ -1011,6 +1231,12 @@
             curlHistory.length = 0;
             openSince = 0;
             prevThumb = prevIndex = null;
+            // NOTE: raised-arm state is deliberately NOT cleared here.
+            // Losing the hands is the NORMAL case while arms are raised (they
+            // leave a laptop webcam's frame), and the pose model is what tracks
+            // them. Clearing it here caused the ritual to flicker on and off.
+            // Lowering is reported by updateHandRaised via the pose model, and by
+            // stop() when hand mode is switched off.
             if (currentTarget) currentTarget.classList.remove('hand-hover-zoom');
             currentTarget = null;
             cancelConfirm();
@@ -1059,6 +1285,9 @@
 
             try {
                 await loadLandmarker();
+                // Non-blocking: arm-raise detection improves once it lands, but
+                // the pointer works without it.
+                loadPoseLandmarker();
                 setStatus('searching', 'Requesting camera…');
                 await startCamera();
                 active = true;
@@ -1099,6 +1328,16 @@
             stopCamera();
             hidePointer();
             resetInteractionState();
+            latestPose = null;
+            lastPoseAt = 0;
+            // Turning hand mode off must clear the raised-arm state, otherwise
+            // the server would keep counting this user as donating.
+            posePendingCount = 0;
+            posePendingSince = 0;
+            if (raisedCount !== 0) {
+                raisedCount = 0;
+                if (deps.onHandsRaised) deps.onHandsRaised(0);
+            }
             document.body.classList.remove('hand-control-active');
             if (camPanel) camPanel.classList.add('hidden');
             if (deps.onStop) deps.onStop();
