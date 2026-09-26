@@ -36,6 +36,9 @@ public/
 │   ├── reset-effect.css       # Reset-round flash animation
 │   ├── user-transitions.css   # User join/leave (fly-in + dematerialize)
 │   ├── super-saiyan.css       # DBZ transformation effects
+│   ├── hand-control.css       # Ki pointer, trail, webcam panel, card magnet
+│   ├── genkidama.css          # Spirit Bomb ritual + hand-mode avatar badges
+│   ├── easter-eggs.css        # Kamehameha, Konami code effects
 │   ├── halloween-theme.css    # October theme
 │   ├── christmas-theme.css    # December theme
 │   └── monthly-themes.css     # 12-month seasonal themes
@@ -45,6 +48,11 @@ public/
 │   ├── themes.js              # Monthly/Halloween/Christmas themes + applyTheme
 │   ├── music-player.js        # Music panel + playlist (standalone singleton)
 │   ├── avatar-effects.js      # Collision punches, Super Saiyan, celebration overlay
+│   ├── easter-eggs.js         # Kamehameha progression, Konami code
+│   ├── hand-control.js        # Webcam hand/pose tracking, ki pointer, gestures
+│   ├── user-grab.js           # Grab & throw avatar physics + ki beam
+│   ├── genkidama.js           # Spirit Bomb ritual (sphere, tiers, theme music)
+│   ├── round-timer.js         # Time since last reset
 │   ├── socket-listeners.js    # All socket.io client event listeners
 │   ├── socket.js              # (placeholder, currently unused)
 │   └── main.js                # Orchestration: DOM refs, state, login, rendering, handlers
@@ -99,6 +107,45 @@ const avatarEffects = window.SPP.avatarEffects.create({
 3. Secure filename generated with `crypto.randomBytes`
 4. Response returns `/uploads/<filename>` path
 5. Client emits `update-avatar` socket event → server broadcasts to session
+
+### Webcam Features (Ki Control & Genkidama)
+`hand-control.js` owns the camera and runs two MediaPipe models on the same
+video element:
+
+- **Hand Landmarker** (2 hands) → pointer position and the click gesture. The
+  pointer is anchored to the **index knuckle**, not a fingertip: the knuckle
+  barely moves when the hand closes into a fist, so the cursor doesn't drift at
+  the exact moment you click.
+- **Pose Landmarker** (throttled to ~10 fps) → the Genkidama arm-raise check.
+  This model is necessary because raising your arms pushes the hands out of a
+  laptop webcam's frame; the hand model then sees nothing, while shoulders and
+  elbows remain visible. Thresholds are **torso-relative** so they hold at any
+  distance from the camera.
+
+The module is purely an input layer: it synthesises hover/click on the existing
+interactive elements and reports gestures through injected callbacks
+(`onGrabStart`, `onHandsRaised`, ...). It never talks to the socket directly.
+
+Interaction state that other users must see (hand mode on/off, arms raised,
+grabs) is routed **through the server**, which validates it and broadcasts to the
+room. That keeps every client in sync and makes the anti-abuse rules
+unbypassable from the client.
+
+#### Gotchas worth knowing
+- **CSS custom properties don't interpolate** in transitions unless registered
+  with `@property`. The Genkidama sphere size is therefore eased frame-by-frame
+  in JS; transitioning `--sphere-scale` made it jump.
+- **Don't cancel a drift animation to fade an element out.** Setting
+  `animation: none` snaps `transform` back to its base value mid-cycle, which
+  reads as a visual jolt. Fade opacity only.
+- **Backdrop stacking classes must outlive their fade.** The class that lifts the
+  UI above a full-screen gif has to be removed *after* the fade completes, or the
+  still-visible gif paints over the header.
+- **Never put a shake/transform on `<body>`.** A transformed ancestor becomes the
+  containing block for `position: fixed` elements, dragging the ki pointer and
+  beams along with it. Shake `#game-screen` instead.
+- **Large gifs must be preloaded and revealed only once decoded**, otherwise the
+  browser paints them while still streaming and restarts their loop.
 
 ### Background Jobs (`server/sessions.js`)
 - **Heartbeat check** every 30s: removes users with no heartbeat for 30 min
