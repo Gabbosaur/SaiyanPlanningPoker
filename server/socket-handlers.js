@@ -588,42 +588,68 @@ const kamehamehaFireCooldowns = new Map();
 const kamehamehaStageThrottles = new Map();
 const KAMEHAMEHA_FIRE_COOLDOWN_MS = 3500;
 const KAMEHAMEHA_STAGE_THROTTLE_MS = 250;
+// Ultimate kamehameha: blocks ALL kamehamehas in the session for this long.
+const KAMEHAMEHA_ULTIMATE_SESSION_LOCK_MS = 30_000;
 
 // Kamehameha stun: socket.id -> expiry timestamp (ms since epoch).
 // Stunned players cannot punch others (user-collision is rejected server-side).
 const STUN_DURATION_MS = 15000;
 const kamehamehaStun = new Map();
+// sessionId -> expiry timestamp. While set, no kamehameha of any stage fires.
+const sessionKameLock = new Map();
 
 function handleKamehameha(io, socket, data) {
     const { sessionId, stage } = data || {};
     if (!sessionId || !sessions[sessionId] || !sessions[sessionId].users[socket.id]) return;
 
-    const stageNum = Number(stage) || 4;
-    if (stageNum < 1 || stageNum > 4) return;
+    // Accept stages 1-4, 5, and 'fire' (base fire after the hold window).
+    const stageRaw = stage === 'fire' ? 'fire' : (Number(stage) || 4);
+    if (typeof stageRaw === 'number' && (stageRaw < 1 || stageRaw > 5)) return;
 
     const now = Date.now();
-    if (stageNum === 4) {
+
+    // Session-wide lock after an ultimate: no kamehameha at all for 30s.
+    const lockUntil = sessionKameLock.get(sessionId) || 0;
+    if (now < lockUntil) return;
+
+    // Stage 4 is now a "hold" event: show the charge-hold visual but don't
+    // fire. The actual firing comes as a separate 'fire' or 5 event.
+    if (stageRaw === 4) {
+        // Just throttle the charge animations, same as stages 1-3.
+        const last = kamehamehaStageThrottles.get(socket.id) || 0;
+        if (now - last < KAMEHAMEHA_STAGE_THROTTLE_MS) return;
+        kamehamehaStageThrottles.set(socket.id, now);
+    } else if (stageRaw === 'fire' || stageRaw === 5) {
+        // Actual fire: per-user cooldown (so you can't spam base fires).
         const last = kamehamehaFireCooldowns.get(socket.id) || 0;
         if (now - last < KAMEHAMEHA_FIRE_COOLDOWN_MS) return;
         kamehamehaFireCooldowns.set(socket.id, now);
 
-        // Everyone in the session (except the caster) is stunned for STUN_DURATION_MS
+        // Stun + knockback.
         Object.keys(sessions[sessionId].users).forEach((uid) => {
             if (uid === socket.id) return;
             kamehamehaStun.set(uid, now + STUN_DURATION_MS);
         });
+
+        // Ultimate locks the whole session for 30s.
+        if (stageRaw === 5) {
+            sessionKameLock.set(sessionId, now + KAMEHAMEHA_ULTIMATE_SESSION_LOCK_MS);
+        }
     } else {
+        // Stages 1-3: just throttle.
         const last = kamehamehaStageThrottles.get(socket.id) || 0;
         if (now - last < KAMEHAMEHA_STAGE_THROTTLE_MS) return;
         kamehamehaStageThrottles.set(socket.id, now);
     }
 
     const fromName = sanitizeInput(sessions[sessionId].users[socket.id].name || 'Someone');
-    if (stageNum === 4) {
+    if (stageRaw === 'fire') {
         console.log(`Kamehameha fired by ${fromName} in session ${sessionId}`);
+    } else if (stageRaw === 5) {
+        console.log(`ULTIMATE Kamehameha fired by ${fromName} in session ${sessionId} (session locked 30s)`);
     }
     io.to(sessionId).emit('kamehameha-fired', {
-        stage: stageNum,
+        stage: stageRaw,
         fromName,
         fromUserId: socket.id
     });

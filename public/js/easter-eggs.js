@@ -12,6 +12,12 @@
     const FIRE_COOLDOWN_MS = 3500;
     // If the user stops typing for too long between stages, reset the progress.
     const STAGE_RESET_MS = 4000;
+    // Stage 5 ("kamehameha!"): if the user hits ! within this window after
+    // the base fire (stage 4), the beam upgrades to the ultimate variant with
+    // a full-screen gif backdrop.
+    const EXCLAMATION_WINDOW_MS = 1000;
+    const KAME_GIF_URL = '/images/kamegif.gif';
+    let kameGifPreload = null;
 
     // --- Konami code -----------------------------------------------------
     // Up Up Down Down Left Right Left Right B A
@@ -52,6 +58,7 @@
     let lastStageReached = 0; // 0..4
     let lastStageAt = 0;
     let lastFireAt = 0;
+    let exclamationTimer = null;  // pending base-fire timeout
     let socketRef = null;
     let sessionIdGetter = null;
     let socketGetter = null;
@@ -355,12 +362,43 @@
             // Reset so another fresh "kamehameha" is needed for a new one
             buffer = '';
             lastStageReached = 0;
-        } else {
-            lastStageReached = matched;
+            lastStageAt = now;
+
+            // DON'T fire immediately. Enter a "charged and ready" state: the
+            // beam is held in a liquid/charging pose for EXCLAMATION_WINDOW_MS.
+            // If the user hits ! in that window, it upgrades to stage 5
+            // (ultimate). Otherwise, after the window, the base fire goes out.
+            requestKamehamehaStage(4); // charge-hold visual (stage 4 = hold)
+            exclamationTimer = setTimeout(() => {
+                exclamationTimer = null;
+                requestKamehamehaStage('fire');  // base fire
+            }, EXCLAMATION_WINDOW_MS);
+            return;
         }
+        lastStageReached = matched;
         lastStageAt = now;
 
         requestKamehamehaStage(matched);
+    }
+
+    /**
+     * Watches for `!` (Shift+1) within EXCLAMATION_WINDOW_MS of a stage 4 fire.
+     * The normal `onKeyDown` ignores non-letters, so this needs its own handler.
+     */
+    function onExclamationKeyDown(event) {
+        // Accept both the literal '!' (most layouts with Shift+1) and the
+        // unlikely edge case of an explicit Shift+1 that produces '1'.
+        if (event.key !== '!' && !(event.key === '1' && event.shiftKey)) return;
+        const tag = event.target && event.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+        // Only meaningful while the "charged and ready" window is open.
+        if (!exclamationTimer) return;
+
+        // Cancel the pending base fire and launch the ultimate instead.
+        clearTimeout(exclamationTimer);
+        exclamationTimer = null;
+        requestKamehamehaStage(5);
     }
 
     /**
@@ -390,12 +428,45 @@
         if (stage < 4) {
             showChargeOrb(stage);
             startChargingSound();
-        } else {
-            // Fire!
+        } else if (stage === 4) {
+            // "Charged and ready": the beam is held in a volatile state, waiting
+            // for the ! to decide whether it fires as base or ultimate. Visually
+            // this is a large pulsing orb that feels like it's about to burst.
+            showChargeHold();
+        } else if (stage === 'fire' || stage === 'fire-base') {
+            // Base fire (no ! was pressed within the window).
             stopChargingSound();
-            showCaptionIfAny(fromName);
+            showCaptionIfAny(fromName, false);
             fireWave(fromUserId);
+        } else if (stage === 5) {
+            // Ultimate fire (! was pressed in time).
+            stopChargingSound();
+            showCaptionIfAny(fromName, true);
+            fireUltimateWave(fromUserId);
         }
+    }
+
+    /** Stage 4 hold: a volatile, pulsing orb that says "I'm about to fire". */
+    function showChargeHold() {
+        document.querySelectorAll('.kamehameha-charge').forEach((el) => el.remove());
+
+        const orb = document.createElement('div');
+        orb.className = 'kamehameha-charge charge-hold';
+        document.body.appendChild(orb);
+
+        spawnChargeInflow(4);
+        spawnChargeArcs(4);
+
+        const shakeTarget = document.getElementById('game-screen')
+            || document.querySelector('main');
+        if (shakeTarget) {
+            shakeTarget.classList.add('kamehameha-rumble-3');
+            setTimeout(() => shakeTarget.classList.remove('kamehameha-rumble-3'), 1500);
+        }
+
+        // The orb stays until the fire (base or ultimate) cleans it up.
+        // Safety: auto-remove if nothing fires within 2s (shouldn't happen).
+        setTimeout(() => orb.remove(), 2000);
     }
 
     // --- Charge orb (stages 1-3) ---
@@ -506,6 +577,9 @@
     // --- Fire (stage 4) ---
 
     function fireWave(fromUserId) {
+        // Clean up any hold orb left from the charge-hold phase.
+        document.querySelectorAll('.kamehameha-charge').forEach((el) => el.remove());
+
         // Flash/orb burst at the firing point
         const burst = document.createElement('div');
         burst.className = 'kamehameha-charge charge-stage-4';
@@ -533,6 +607,15 @@
             wave.className = 'kamehameha-wave';
             document.body.appendChild(wave);
 
+            // Sustained energy trail behind the wave head (the anime look).
+            // Driven per-frame from the wave's actual position so the two stay
+            // perfectly linked, instead of two independent CSS animations that
+            // inevitably desync.
+            const trail = document.createElement('div');
+            trail.className = 'kamehameha-trail';
+            document.body.appendChild(trail);
+            linkTrailToWave(trail, wave, 2500);
+
             // Blinding white flash as the beam erupts.
             const flash = document.createElement('div');
             flash.className = 'kameha-fire-flash';
@@ -549,10 +632,155 @@
             }
 
             // Knock everyone away (except the caster) with a staggered sweep
-            applyKnockbackToParticipants(fromUserId);
+            applyKnockbackToParticipants(fromUserId, 2200);
 
-            setTimeout(() => wave.remove(), 1900);
+            setTimeout(() => { wave.remove(); }, 2500);
         }, 250);
+    }
+
+    /**
+     * Ultimate Kamehameha (stage 5): everything the base fire does, PLUS a
+     * full-screen gif backdrop (same approach as Konami/Genkidama) and a wider,
+     * brighter beam.
+     */
+    function fireUltimateWave(fromUserId) {
+        // Clean up any hold orb.
+        document.querySelectorAll('.kamehameha-charge').forEach((el) => el.remove());
+
+        // Full-screen backdrop: gif revealed only once decoded.
+        showKameBackdrop();
+
+        // Bigger muzzle blast: 5 rings + 32 debris.
+        fireMuzzleBlast();
+        fireMuzzleBlast(); // double it
+
+        // Sound
+        try {
+            const audio = new Audio('/sounds/kamehameha-fire.mp3');
+            audio.volume = 1;
+            audio.play().catch(() => {});
+        } catch (e) { /* ignore */ }
+
+        // Bigger burst orb
+        const burst = document.createElement('div');
+        burst.className = 'kamehameha-charge charge-stage-4';
+        burst.style.transform = 'translate(-50%, -50%) scale(1.8)';
+        document.body.appendChild(burst);
+        setTimeout(() => burst.remove(), 700);
+
+        setTimeout(() => {
+            // The ultimate wave is wider and brighter than the standard one.
+            const wave = document.createElement('div');
+            wave.className = 'kamehameha-wave kamehameha-wave-ultimate';
+            document.body.appendChild(wave);
+
+            // Wider, brighter, slower trail for the ultimate.
+            const trail = document.createElement('div');
+            trail.className = 'kamehameha-trail kamehameha-trail-ultimate';
+            document.body.appendChild(trail);
+            linkTrailToWave(trail, wave, 4000);
+
+            const flash = document.createElement('div');
+            flash.className = 'kameha-fire-flash';
+            document.body.appendChild(flash);
+            setTimeout(() => flash.remove(), 800);
+
+            crackleAlongBeam();
+            crackleAlongBeam(); // double the lightning
+
+            const shakeTarget = document.getElementById('game-screen')
+                || document.querySelector('main');
+            if (shakeTarget) {
+                shakeTarget.classList.add('kamehameha-shake');
+                setTimeout(() => shakeTarget.classList.remove('kamehameha-shake'), 1200);
+            }
+
+            applyKnockbackToParticipants(fromUserId, 3500);
+
+            setTimeout(() => { wave.remove(); }, 4000);
+        }, 250);
+    }
+
+    function showKameBackdrop() {
+        document.querySelectorAll('.kame-backdrop').forEach((el) => el.remove());
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'kame-backdrop';
+
+        const img = document.createElement('img');
+        img.alt = '';
+        img.className = 'kame-backdrop-img';
+        img.style.opacity = '0';
+        img.src = (kameGifPreload && kameGifPreload.src) || KAME_GIF_URL;
+        const reveal = () => { img.style.opacity = ''; };
+        if (img.decode) {
+            img.decode().then(reveal).catch(reveal);
+        } else if (img.complete) {
+            reveal();
+        } else {
+            img.addEventListener('load', reveal, { once: true });
+            img.addEventListener('error', reveal, { once: true });
+        }
+
+        backdrop.appendChild(img);
+        document.body.appendChild(backdrop);
+        document.body.classList.add('kame-ultimate-active');
+
+        // Fade out and clean up, same approach as the Konami backdrop.
+        const DISPLAY_MS = 5000;
+        const FADE_MS = 1800;
+        setTimeout(() => {
+            backdrop.classList.add('fading');
+            setTimeout(() => {
+                backdrop.remove();
+                if (!document.querySelector('.kame-backdrop')) {
+                    document.body.classList.remove('kame-ultimate-active');
+                }
+            }, FADE_MS + 100);
+        }, DISPLAY_MS);
+    }
+
+    /** Recoil blast at the firing point: shockwave rings + flying debris. */
+    /**
+     * Links the trail's width to the wave head's actual rendered position every
+     * frame, so the two stay pixel-locked regardless of easing or timing
+     * differences. Once the wave exits the screen or is removed, the trail fades
+     * and cleans itself up.
+     */
+    function linkTrailToWave(trail, wave, lifetimeMs) {
+        const trailLeft = trail.getBoundingClientRect().left || (window.innerWidth * 0.08);
+        let rafId = null;
+
+        // Show the trail after a brief moment (matches the wave appearing).
+        requestAnimationFrame(() => trail.classList.add('active'));
+
+        function sync() {
+            if (!wave.isConnected || !trail.isConnected) {
+                fadeOut();
+                return;
+            }
+            const waveRect = wave.getBoundingClientRect();
+            // The wave's right edge is where its leading energy ends.
+            const headX = waveRect.right;
+            const width = Math.max(0, headX - trailLeft);
+            trail.style.width = width + 'px';
+            rafId = requestAnimationFrame(sync);
+        }
+
+        function fadeOut() {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = null;
+            trail.classList.remove('active');
+            trail.classList.add('fading');
+            setTimeout(() => trail.remove(), 1400);
+        }
+
+        rafId = requestAnimationFrame(sync);
+
+        // Safety: clean up even if the wave element was removed unexpectedly.
+        setTimeout(() => {
+            if (trail.isConnected && !trail.classList.contains('fading')) fadeOut();
+        }, lifetimeMs + 200);
     }
 
     /** Recoil blast at the firing point: shockwave rings + flying debris. */
@@ -634,8 +862,8 @@
      * to see, and flags the local user via a body class so the main app can
      * disable their punch interactions.
      */
-    function applyKnockbackToParticipants(casterId) {
-        const WAVE_DURATION_MS = 1600; // keep in sync with the CSS travel animation
+    function applyKnockbackToParticipants(casterId, waveDurationMs) {
+        const WAVE_DURATION_MS = waveDurationMs || 2200;
         const STUN_DURATION_MS = 15000; // must match the server-side stun window
         const viewportWidth = window.innerWidth;
 
@@ -711,11 +939,13 @@
         return socketGetter ? socketGetter() : socketRef;
     }
 
-    function showCaptionIfAny(fromName) {
+    function showCaptionIfAny(fromName, ultimate) {
         if (!fromName) return;
         const label = document.createElement('div');
         label.className = 'kamehameha-label';
-        label.textContent = `${fromName} KAMEHAMEHA!`;
+        label.textContent = ultimate
+            ? `${fromName} ULTIMATE KAMEHAMEHA!`
+            : `${fromName} KAMEHAMEHA!`;
         document.body.appendChild(label);
         setTimeout(() => label.remove(), 2200);
     }
@@ -737,7 +967,9 @@
         sessionIdGetter = deps.getSessionId || null;
         document.addEventListener('keydown', onKonamiKeyDown);
         document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keydown', onExclamationKeyDown);
         preloadKonamiGif();
+        preloadKameGif();
     }
 
     /**
@@ -758,6 +990,21 @@
             requestIdleCallback(start, { timeout: 4000 });
         } else {
             setTimeout(start, 2500);
+        }
+    }
+
+    function preloadKameGif() {
+        if (kameGifPreload) return;
+        const start = () => {
+            kameGifPreload = new Image();
+            kameGifPreload.decoding = 'async';
+            if ('fetchPriority' in kameGifPreload) kameGifPreload.fetchPriority = 'low';
+            kameGifPreload.src = KAME_GIF_URL;
+        };
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(start, { timeout: 6000 });
+        } else {
+            setTimeout(start, 4000);
         }
     }
 
