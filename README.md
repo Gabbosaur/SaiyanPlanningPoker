@@ -26,17 +26,18 @@ Optional mode that lets you drive the interface with hand gestures:
 Toggle it with the ✋ button in the header. Requires camera permission, and a
 secure context (HTTPS or `localhost`).
 
-### Easter eggs
+### Playful interactions
 
-- **Punch** a teammate by clicking their avatar; spam your own to go Super Saiyan
-- **Grab & throw**: with Ki Control on, close your fist on an avatar to grab, sling
-  and slam it around (with server-side limits so it can't be abused)
-- **Kamehameha**: type `kamehameha` to charge and fire
-- **Genkidama**: everyone on Ki Control raises their arms to donate energy; the
-  sphere grows with the number of raised arms until the ritual completes
-- **Konami code**: ↑ ↑ ↓ ↓ ← → ← → B A
-- **Stickers**: using a character or teammate name unlocks their sticker set,
-  shown to the whole session with animations that match the emotion
+- **Punch** a teammate by clicking their avatar
+- **Grab & throw**: with Ki Control on, close your fist on an avatar to grab,
+  sling and slam it around (server-side limits keep it from being abused)
+- **Stickers**: unlockable reaction packs, shown to the whole session with
+  animations that match the emotion
+- **Collective rituals** that need more than one person to pull off
+
+There are also a handful of hidden commands and secret gestures. Half the fun is
+finding them, so they're left for you to discover — try typing something a Saiyan
+would shout, or an old console cheat.
 
 ## Getting Started
 

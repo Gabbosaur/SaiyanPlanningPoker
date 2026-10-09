@@ -21,13 +21,22 @@ A real-time web application that gamifies agile planning poker sessions with a D
 - **Accidental-input safeguards**: Edge-triggered clicks, dwell time, cooldowns, and a hold-to-confirm gesture for the destructive reset action.
 
 ### Playful Interactions
-- **Punches & Super Saiyan**: Click a teammate's avatar to land a punch; spam your own to transform.
+- **Punches**: Click a teammate's avatar to land a punch, with impact effects everyone sees.
 - **Grab & throw**: Close your fist on an avatar to grab, drag and fling it, with spring physics and wall-impact effects. Server-enforced limits prevent abuse (cooldowns, auto-release, no interrupting someone who is still voting).
-- **Kamehameha**: Type the name to charge and fire a screen-crossing beam that knocks everyone back.
-- **Genkidama**: A collective ritual. Users on Ki Control raise their arms to donate energy; the sphere grows with the number of raised arms and the ceremony fires when everyone commits. Purely ceremonial, it changes no game state.
-- **Konami code**: Transforms your avatar and triggers a full-screen Super Saiyan 2 spectacle for the whole session.
-- **Name-gated stickers**: Picking a character (or teammate) name unlocks that person's sticker set. Sending one pops it next to your avatar for everyone to see, with motion that matches the emotion. Display names are self-declared, so this is an incentive to use fun names rather than an access control.
+- **Sticker reactions**: Unlockable reaction packs, broadcast to the session with motion that matches the emotion (a laugh wobbles, a surprise snaps in).
+- **Collective rituals**: Some effects can only be triggered by several people acting together, turning them into a small team ceremony.
 - **Seasonal themes**: Monthly, Halloween and Christmas variants.
+
+### Hidden Content
+The app contains a number of easter eggs: secret typed commands, gesture
+combinations and unlockables tied to the display name you choose.
+
+**These are deliberately left undocumented.** Discovering them is part of the
+experience, and spelling out the triggers would remove the surprise that makes
+them worth having. They're also a reason to revisit the app and to pick a
+playful name. The implementation details live in the code for maintainers;
+`docs/structure.md` covers how to extend the unlockable content without listing
+the triggers themselves.
 
 ## Target Users
 - **Agile Development Teams**: Scrum masters and development teams conducting sprint planning
