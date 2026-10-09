@@ -129,6 +129,10 @@
 
         socket.on('session-joined', (data) => {
             const { session, cardDecks } = data;
+
+            // Stickers unlocked by this display name (easter egg).
+            const stickersApi = deps.getStickers && deps.getStickers();
+            if (stickersApi) stickersApi.setAvailable(data.stickers);
             loginScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
             setSafeContent(sessionIdDisplay, sanitizeInput(getSessionId()));
@@ -375,6 +379,11 @@
 
         socket.on('emoji-received', (data) => {
             showEmojiReaction(data);
+        });
+
+        socket.on('sticker-received', (data) => {
+            const stickersApi = deps.getStickers && deps.getStickers();
+            if (stickersApi) stickersApi.show(data);
         });
 
         socket.on('celebrate-consensus', () => {

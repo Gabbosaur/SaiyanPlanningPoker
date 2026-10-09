@@ -20,6 +20,7 @@ server/
 ├── security.js           # sanitizeInput, CSRF, rate limiting, CSP headers
 ├── uploads.js            # Multer config + /upload-avatar route
 ├── game.js               # Card decks + result calculation (mode/avg/consensus)
+├── stickers.js           # Name-gated sticker catalogue, unlock + anim rules
 ├── sessions.js           # In-memory session store + background cleanup jobs
 └── socket-handlers.js    # All socket.io event handlers (join, vote, reset, etc.)
 ```
@@ -52,6 +53,7 @@ public/
 │   ├── hand-control.js        # Webcam hand/pose tracking, ki pointer, gestures
 │   ├── user-grab.js           # Grab & throw avatar physics + ki beam
 │   ├── genkidama.js           # Spirit Bomb ritual (sphere, tiers, theme music)
+│   ├── stickers.js            # Sticker picker + pop-in reactions
 │   ├── round-timer.js         # Time since last reset
 │   ├── socket-listeners.js    # All socket.io client event listeners
 │   ├── socket.js              # (placeholder, currently unused)
@@ -146,6 +148,36 @@ unbypassable from the client.
   beams along with it. Shake `#game-screen` instead.
 - **Large gifs must be preloaded and revealed only once decoded**, otherwise the
   browser paints them while still streaming and restarts their loop.
+
+### Adding a Sticker Pack
+Packs live in `public/images/stickers/<name>/`. Source art is typically exported
+with the editor's transparency checkerboard baked in, so it needs processing
+first:
+
+```bash
+# Strip the checkerboard, trim, downscale and rename in one pass
+python3 tools/remove-sticker-bg.py --finalise public/images/stickers/<name>
+
+# Check for leftover background, holes in the artwork, oversized files
+python3 tools/verify-stickers.py <name>
+```
+
+Then add the set to `STICKER_SETS` in `server/stickers.js` with its `aliases`
+(and optional `patterns` for stretched-out spellings). `npm test` validates the
+catalogue: missing files, duplicate ids, alias clashes and unmapped animations
+all fail the build.
+
+Naming matters: files are renamed onto a shared vocabulary (`thumbsup`,
+`surprised`, `laugh`, `thanks`, `hello`, `coolpose`, `victory`, `angry`, ...)
+because the pop-in **animation is derived from the sticker id**. Follow it and a
+new pack gets the right motion for free.
+
+If a cut-out still shows checkerboard, it's almost always a patch of background
+walled off from the image border, which the flood fill can't reach:
+
+```bash
+python3 tools/clean-sticker-islands.py <name>
+```
 
 ### Background Jobs (`server/sessions.js`)
 - **Heartbeat check** every 30s: removes users with no heartbeat for 30 min

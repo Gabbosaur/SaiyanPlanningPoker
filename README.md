@@ -35,6 +35,8 @@ secure context (HTTPS or `localhost`).
 - **Genkidama**: everyone on Ki Control raises their arms to donate energy; the
   sphere grows with the number of raised arms until the ritual completes
 - **Konami code**: ↑ ↑ ↓ ↓ ← → ← → B A
+- **Stickers**: using a character or teammate name unlocks their sticker set,
+  shown to the whole session with animations that match the emotion
 
 ## Getting Started
 

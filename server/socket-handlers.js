@@ -3,6 +3,7 @@
 const { sanitizeInput, isValidCsrfToken } = require('./security');
 const { sessions } = require('./sessions');
 const { cardDecks, calculateResults } = require('./game');
+const stickers = require('./stickers');
 
 const ALLOWED_EMOJIS = ['👍', '👎', '❓', '🎉', '😂', '🔥', '⚡', '💪'];
 
@@ -37,6 +38,7 @@ function registerSocketHandlers(io) {
         socket.on('konami', (data) => handleKonami(io, socket, data));
         socket.on('hand-mode', (data) => handleHandMode(io, socket, data));
         socket.on('hands-raised', (data) => handleHandsRaised(io, socket, data));
+        socket.on('send-sticker', (data) => handleSendSticker(io, socket, data));
         socket.on('kamehameha', (data) => handleKamehameha(io, socket, data));
         socket.on('user-collision', (data) => handleUserCollision(io, socket, data));
         socket.on('toggle-spectator', (data) => handleToggleSpectator(io, socket, data));
@@ -151,7 +153,9 @@ function handleJoinSession(io, socket, data) {
 
         socket.emit('session-joined', {
             session: sessions[sessionId],
-            cardDecks
+            cardDecks,
+            // Stickers this display name has unlocked (easter egg).
+            stickers: stickers.getStickersFor(user.name)
         });
         socket.to(sessionId).emit('user-joined', sessions[sessionId].users[socket.id]);
     } catch (error) {
@@ -383,6 +387,45 @@ function handleUpdateAvatar(io, socket, data) {
     } catch (error) {
         console.error('Error updating avatar:', error);
         socket.emit('error', { message: 'Failed to update avatar' });
+    }
+}
+
+// --- Name-gated stickers ----------------------------------------------------
+// Rate limited so a sticker set can't be used to spam the room.
+const STICKER_COOLDOWN_MS = 1200;
+const stickerCooldowns = new Map();
+
+function handleSendSticker(io, socket, data) {
+    try {
+        const { sessionId, stickerId, targetUserId } = data || {};
+        const session = sessions[sessionId];
+        if (!session || !session.users[socket.id]) return;
+
+        const sender = session.users[socket.id];
+
+        // The unlock check lives here, not on the client, so nobody can send a
+        // sticker their name hasn't unlocked.
+        if (!stickers.canSend(sender.name, stickerId)) return;
+
+        const now = Date.now();
+        const last = stickerCooldowns.get(socket.id) || 0;
+        if (now - last < STICKER_COOLDOWN_MS) return;
+        stickerCooldowns.set(socket.id, now);
+
+        const sticker = stickers.findSticker(stickerId);
+        if (!sticker) return;
+
+        io.to(sessionId).emit('sticker-received', {
+            sticker,
+            from: {
+                id: socket.id,
+                name: sanitizeInput(sender.name)
+            },
+            // Only honour a target that's actually in the session.
+            to: (targetUserId && session.users[targetUserId]) ? targetUserId : null
+        });
+    } catch (error) {
+        console.error('Error sending sticker:', error);
     }
 }
 

@@ -1,0 +1,409 @@
+/* stickers.css - Name-gated sticker picker + the pop-in reaction */
+
+/* ===== Picker panel ===================================================== */
+/* Mirrors the emoji panel: a collapsed badge that expands on hover (desktop)
+   or tap (touch). Sits just above the emoji panel so the two don't overlap. */
+.spp-sticker-panel {
+    position: fixed;
+    bottom: 5.5rem;
+    right: 1rem;
+    z-index: 30;
+    background: rgba(17, 24, 39, 0.85);
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    border-radius: 0.75rem;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    width: 3rem;
+    height: 3rem;
+}
+
+.spp-sticker-toggle {
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #facc15;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+}
+
+.spp-sticker-list {
+    display: none;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0 0.5rem 0.5rem;
+    max-height: 15rem;
+    overflow-y: auto;
+}
+
+/* Expanded: on hover (desktop) or when toggled (touch) */
+.spp-sticker-panel:hover,
+.spp-sticker-panel.expanded {
+    width: 15rem;
+    height: auto;
+}
+
+.spp-sticker-panel:hover .spp-sticker-list,
+.spp-sticker-panel.expanded .spp-sticker-list {
+    display: flex;
+}
+
+.spp-sticker-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.04);
+    color: #e5e7eb;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.spp-sticker-btn:hover {
+    background: rgba(250, 204, 21, 0.18);
+    border-color: rgba(250, 204, 21, 0.5);
+    transform: translateX(2px);
+}
+
+.spp-sticker-glyph {
+    font-size: 1.4rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+/* Image-pack thumbnail in the picker */
+.spp-sticker-thumb {
+    width: 2.2rem;
+    height: 2.2rem;
+    object-fit: contain;
+    flex-shrink: 0;
+    /* Transparent PNGs read poorly on a dark panel, so add a subtle rim light */
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+}
+
+.spp-sticker-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== Pop-in reaction ================================================== */
+.spp-sticker-pop {
+    position: fixed;
+    z-index: 9990;
+    pointer-events: none;
+    text-align: center;
+    /* NOTE: every keyframe below must re-apply the -50% X translate, otherwise
+       the sticker snaps sideways the moment its animation takes over. */
+    transform: translate(-50%, 0);
+    will-change: transform, opacity;
+    /* Default; overridden per emotion by the .anim-* classes further down. */
+    animation: spp-sticker-pop-anim 2.6s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+.spp-sticker-pop-glyph {
+    font-size: 3.6rem;
+    line-height: 1;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
+}
+
+/* Image sticker in the pop-in. Sized generously since these are illustrations
+   rather than icons, with a glow that lifts them off the dark background. */
+.spp-sticker-pop-img {
+    width: 9rem;
+    height: 9rem;
+    object-fit: contain;
+    display: block;
+    filter:
+        drop-shadow(0 0 10px rgba(250, 204, 21, 0.55))
+        drop-shadow(0 6px 14px rgba(0, 0, 0, 0.75));
+}
+
+.spp-sticker-pop-label {
+    margin-top: 0.15rem;
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    color: #fff;
+    white-space: nowrap;
+    text-shadow:
+        0 0 10px rgba(250, 204, 21, 0.95),
+        0 0 20px rgba(255, 150, 0, 0.8),
+        0 2px 6px rgba(0, 0, 0, 0.9);
+}
+
+.spp-sticker-pop-credit {
+    margin-top: 0.1rem;
+    font-size: 0.68rem;
+    color: rgba(229, 231, 235, 0.85);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+/* Compact variant, used when the sticker pops on a result card in the
+   "Individual Votes" row: those cards are far smaller than the table avatars,
+   so the full-size sticker would bury the whole row. */
+.spp-sticker-pop.compact .spp-sticker-pop-img {
+    width: 5rem;
+    height: 5rem;
+}
+
+.spp-sticker-pop.compact .spp-sticker-pop-glyph {
+    font-size: 2.2rem;
+}
+
+.spp-sticker-pop.compact .spp-sticker-pop-label {
+    font-size: 0.72rem;
+}
+
+.spp-sticker-pop.compact .spp-sticker-pop-credit {
+    display: none;
+}
+
+@keyframes spp-sticker-pop-anim {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 10px) scale(0.4) rotate(-8deg);
+    }
+    18% {
+        opacity: 1;
+        transform: translate(-50%, -36px) scale(1.12) rotate(3deg);
+    }
+    30% {
+        transform: translate(-50%, -44px) scale(1) rotate(0deg);
+    }
+    75% {
+        opacity: 1;
+        transform: translate(-50%, -62px) scale(1) rotate(0deg);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -96px) scale(0.9) rotate(0deg);
+    }
+}
+
+/* Keep the panel out of the way on small screens */
+@media (max-width: 640px) {
+    .spp-sticker-panel {
+        bottom: 5rem;
+    }
+
+    .spp-sticker-panel:hover,
+    .spp-sticker-panel.expanded {
+        width: 12rem;
+    }
+
+    .spp-sticker-pop-glyph {
+        font-size: 2.8rem;
+    }
+
+    .spp-sticker-pop-img {
+        width: 6.5rem;
+        height: 6.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spp-sticker-pop {
+        animation: spp-sticker-pop-fade 2.6s ease-out forwards;
+        transform: translate(-50%, -44px);
+    }
+
+    @keyframes spp-sticker-pop-fade {
+        0%, 80% { opacity: 1; }
+        100%    { opacity: 0; }
+    }
+}
+
+/* ===== Per-emotion animations ==========================================
+   Each sticker gets motion that expresses its emotion rather than one generic
+   pop. The server picks the name from the sticker id; the class is whitelisted
+   client-side.
+
+   Every keyframe re-applies translate(-50%, ...) because that's what keeps the
+   sticker horizontally centred on its anchor.
+   ====================================================================== */
+
+/* --- Pop: the neutral default, used when a sticker has no specific emotion -- */
+.spp-sticker-pop.anim-pop {
+    animation: spp-sticker-pop-anim 2.6s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+/* --- Laugh: bounces and wobbles side to side, like shaking with laughter -- */
+.spp-sticker-pop.anim-laugh {
+    animation: spp-anim-laugh 2.6s cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
+}
+
+@keyframes spp-anim-laugh {
+    0%   { opacity: 0; transform: translate(-50%, 8px) scale(0.5) rotate(0deg); }
+    14%  { opacity: 1; transform: translate(-50%, -34px) scale(1.14) rotate(-11deg); }
+    26%  { transform: translate(-50%, -24px) scale(1.02) rotate(10deg); }
+    38%  { transform: translate(-50%, -40px) scale(1.09) rotate(-9deg); }
+    50%  { transform: translate(-50%, -28px) scale(1) rotate(8deg); }
+    62%  { transform: translate(-50%, -42px) scale(1.05) rotate(-6deg); }
+    74%  { transform: translate(-50%, -34px) scale(1) rotate(4deg); }
+    86%  { opacity: 1; transform: translate(-50%, -46px) scale(1) rotate(-2deg); }
+    100% { opacity: 0; transform: translate(-50%, -78px) scale(0.92) rotate(0deg); }
+}
+
+/* --- Surprise: snaps in oversized, shivers, then backs away -------------- */
+.spp-sticker-pop.anim-surprise {
+    animation: spp-anim-surprise 2.6s cubic-bezier(0.1, 1.4, 0.3, 1) forwards;
+}
+
+@keyframes spp-anim-surprise {
+    0%   { opacity: 0; transform: translate(-50%, 2px) scale(0.2); }
+    8%   { opacity: 1; transform: translate(-50%, -48px) scale(1.45); }
+    16%  { transform: translate(-50%, -44px) scale(1.1); }
+    22%  { transform: translate(-50%, -46px) scale(1.26); }
+    30%  { transform: translate(-50%, -44px) scale(1.16) rotate(2deg); }
+    36%  { transform: translate(-50%, -44px) scale(1.16) rotate(-2deg); }
+    42%  { transform: translate(-50%, -44px) scale(1.16) rotate(0deg); }
+    85%  { opacity: 1; transform: translate(-50%, -50px) scale(1.12); }
+    100% { opacity: 0; transform: translate(-50%, -60px) scale(0.98); }
+}
+
+/* --- Approve: punches upward decisively, settles with a nod -------------- */
+.spp-sticker-pop.anim-approve {
+    animation: spp-anim-approve 2.6s cubic-bezier(0.15, 1.2, 0.3, 1) forwards;
+}
+
+@keyframes spp-anim-approve {
+    0%   { opacity: 0; transform: translate(-50%, 24px) scale(0.6); }
+    12%  { opacity: 1; transform: translate(-50%, -58px) scale(1.2); }
+    22%  { transform: translate(-50%, -40px) scale(1); }
+    30%  { transform: translate(-50%, -50px) scale(1.06); }
+    38%  { transform: translate(-50%, -44px) scale(1); }
+    85%  { opacity: 1; transform: translate(-50%, -50px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -84px) scale(0.95); }
+}
+
+/* --- Bow: dips down in gratitude before drifting up ---------------------- */
+.spp-sticker-pop.anim-bow {
+    animation: spp-anim-bow 2.6s cubic-bezier(0.4, 0, 0.3, 1) forwards;
+}
+
+@keyframes spp-anim-bow {
+    0%   { opacity: 0; transform: translate(-50%, 6px) scale(0.7); }
+    16%  { opacity: 1; transform: translate(-50%, -38px) scale(1.05); }
+    32%  { transform: translate(-50%, -22px) scale(0.97) rotate(6deg); }
+    48%  { transform: translate(-50%, -34px) scale(1) rotate(0deg); }
+    60%  { transform: translate(-50%, -26px) scale(0.99) rotate(4deg); }
+    72%  { transform: translate(-50%, -36px) scale(1) rotate(0deg); }
+    100% { opacity: 0; transform: translate(-50%, -72px) scale(0.95); }
+}
+
+/* --- Wave: sways left-right like a greeting ----------------------------- */
+.spp-sticker-pop.anim-wave {
+    animation: spp-anim-wave 2.6s ease-in-out forwards;
+}
+
+@keyframes spp-anim-wave {
+    0%   { opacity: 0; transform: translate(-50%, 6px) scale(0.6) rotate(-14deg); }
+    14%  { opacity: 1; transform: translate(-50%, -36px) scale(1.08) rotate(12deg); }
+    28%  { transform: translate(-50%, -40px) scale(1) rotate(-12deg); }
+    42%  { transform: translate(-50%, -40px) scale(1) rotate(10deg); }
+    56%  { transform: translate(-50%, -42px) scale(1) rotate(-8deg); }
+    70%  { transform: translate(-50%, -44px) scale(1) rotate(6deg); }
+    85%  { opacity: 1; transform: translate(-50%, -48px) scale(1) rotate(0deg); }
+    100% { opacity: 0; transform: translate(-50%, -76px) scale(0.95) rotate(0deg); }
+}
+
+/* --- Slam: crashes down hard with a shake ------------------------------- */
+.spp-sticker-pop.anim-slam {
+    animation: spp-anim-slam 2.6s cubic-bezier(0.6, 0, 0.4, 1) forwards;
+}
+
+@keyframes spp-anim-slam {
+    0%   { opacity: 0; transform: translate(-50%, -96px) scale(1.6); }
+    10%  { opacity: 1; transform: translate(-50%, -30px) scale(1.3, 0.75); }
+    15%  { transform: translate(-50%, -38px) scale(0.92, 1.18); }
+    20%  { transform: translate(-50%, -34px) scale(1.08, 0.94); }
+    25%  { transform: translate(calc(-50% - 6px), -36px) scale(1); }
+    30%  { transform: translate(calc(-50% + 6px), -36px) scale(1); }
+    35%  { transform: translate(calc(-50% - 3px), -36px) scale(1); }
+    40%  { transform: translate(-50%, -36px) scale(1); }
+    85%  { opacity: 1; transform: translate(-50%, -42px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -62px) scale(0.95); }
+}
+
+/* --- Rise: ascends triumphantly, growing as it goes --------------------- */
+.spp-sticker-pop.anim-rise {
+    animation: spp-anim-rise 2.8s cubic-bezier(0.25, 0.6, 0.3, 1) forwards;
+}
+
+@keyframes spp-anim-rise {
+    0%   { opacity: 0; transform: translate(-50%, 18px) scale(0.55); }
+    18%  { opacity: 1; transform: translate(-50%, -42px) scale(1.1); }
+    40%  { transform: translate(-50%, -62px) scale(1.18); }
+    70%  { opacity: 1; transform: translate(-50%, -86px) scale(1.24); }
+    100% { opacity: 0; transform: translate(-50%, -132px) scale(1.3); }
+}
+
+/* --- Swagger: slides in with a confident tilt --------------------------- */
+.spp-sticker-pop.anim-swagger {
+    animation: spp-anim-swagger 2.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes spp-anim-swagger {
+    0%   { opacity: 0; transform: translate(calc(-50% - 44px), -14px) scale(0.75) rotate(-16deg); }
+    18%  { opacity: 1; transform: translate(calc(-50% + 8px), -40px) scale(1.1) rotate(7deg); }
+    32%  { transform: translate(-50%, -42px) scale(1.04) rotate(-4deg); }
+    46%  { transform: translate(-50%, -44px) scale(1) rotate(2deg); }
+    85%  { opacity: 1; transform: translate(-50%, -48px) scale(1) rotate(0deg); }
+    100% { opacity: 0; transform: translate(calc(-50% + 20px), -74px) scale(0.95) rotate(5deg); }
+}
+
+/* --- Fade: appears quietly and dissolves (deadpan / no comment) --------- */
+.spp-sticker-pop.anim-fade {
+    animation: spp-anim-fade 2.6s ease-in-out forwards;
+}
+
+@keyframes spp-anim-fade {
+    0%   { opacity: 0; transform: translate(-50%, -26px) scale(1); filter: blur(4px); }
+    22%  { opacity: 1; transform: translate(-50%, -34px) scale(1); filter: blur(0); }
+    70%  { opacity: 1; transform: translate(-50%, -38px) scale(1); filter: blur(0); }
+    100% { opacity: 0; transform: translate(-50%, -46px) scale(0.98); filter: blur(5px); }
+}
+
+/* --- Sparkle: shimmers with a gentle float ------------------------------ */
+.spp-sticker-pop.anim-sparkle {
+    animation: spp-anim-sparkle 2.8s ease-in-out forwards;
+}
+
+@keyframes spp-anim-sparkle {
+    0%   { opacity: 0; transform: translate(-50%, 4px) scale(0.5) rotate(-8deg); filter: brightness(2); }
+    16%  { opacity: 1; transform: translate(-50%, -38px) scale(1.12) rotate(4deg); filter: brightness(1.5); }
+    34%  { transform: translate(-50%, -48px) scale(1.02) rotate(-3deg); filter: brightness(1.1); }
+    52%  { transform: translate(-50%, -42px) scale(1.08) rotate(3deg); filter: brightness(1.4); }
+    70%  { transform: translate(-50%, -52px) scale(1.02) rotate(-2deg); filter: brightness(1.1); }
+    86%  { opacity: 1; transform: translate(-50%, -48px) scale(1.05) rotate(0deg); filter: brightness(1.3); }
+    100% { opacity: 0; transform: translate(-50%, -88px) scale(0.95) rotate(0deg); filter: brightness(1); }
+}
+
+/* Reduced motion: keep a plain fade for every variant. */
+@media (prefers-reduced-motion: reduce) {
+    .spp-sticker-pop,
+    .spp-sticker-pop.anim-laugh,
+    .spp-sticker-pop.anim-surprise,
+    .spp-sticker-pop.anim-approve,
+    .spp-sticker-pop.anim-bow,
+    .spp-sticker-pop.anim-wave,
+    .spp-sticker-pop.anim-slam,
+    .spp-sticker-pop.anim-rise,
+    .spp-sticker-pop.anim-swagger,
+    .spp-sticker-pop.anim-fade,
+    .spp-sticker-pop.anim-sparkle {
+        animation: spp-sticker-pop-fade 2.6s ease-out forwards;
+        transform: translate(-50%, -44px);
+    }
+}

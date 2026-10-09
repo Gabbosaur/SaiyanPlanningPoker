@@ -122,6 +122,24 @@ document.addEventListener('DOMContentLoaded', () => {
         ? window.SPP.genkidama.create({ isSoundEnabled: () => soundEnabled })
         : null;
 
+    // Name-gated sticker reactions (easter egg)
+    const stickers = window.SPP.stickers
+        ? window.SPP.stickers.create({
+            onSend: (stickerId, aimAtRandom) => {
+                if (!socket || !sessionId) return;
+                let targetUserId = null;
+                if (aimAtRandom) {
+                    const others = Object.values(participants)
+                        .filter((p) => p.isConnected && p.id !== socket.id);
+                    if (others.length) {
+                        targetUserId = others[Math.floor(Math.random() * others.length)].id;
+                    }
+                }
+                socket.emit('send-sticker', { sessionId, stickerId, targetUserId });
+            }
+        })
+        : null;
+
     // Hand-gesture control (webcam) - extracted to hand-control.js. Opt-in, default OFF.
     const handControlToggle = document.getElementById('hand-control-toggle');
     if (window.SPP.handControl && handControlToggle) {
@@ -588,7 +606,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showReconnectNotification,
             updateConnectionStatus,
             getUserGrab: () => userGrab,
-            getGenkidama: () => genkidama
+            getGenkidama: () => genkidama,
+            getStickers: () => stickers
         });
     }
 
@@ -1147,6 +1166,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isMin) cardClasses += ' breakdown-hint-min';
             if (isMax) cardClasses += ' breakdown-hint-max';
             voteCard.className = cardClasses;
+            // Marks the card so sticker reactions can pop here while the
+            // results view is open (that's where everyone is looking, rather
+            // than at the avatars around the table).
+            voteCard.setAttribute('data-breakdown-user-id', userId);
 
             // Hint badge (LOW / HIGH) positioned above the card
             if (isMin || isMax) {

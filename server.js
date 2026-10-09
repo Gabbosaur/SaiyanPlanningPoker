@@ -112,6 +112,13 @@ app.get('/sounds/:filename', (req, res) => {
 
 // --- Socket.io + background jobs ---
 
+// Fail loudly on a malformed sticker catalogue instead of serving broken images.
+const stickerProblems = require('./server/stickers').validateCatalogue();
+if (stickerProblems.length) {
+    console.warn('Sticker catalogue problems:');
+    stickerProblems.forEach((p) => console.warn('  -', p));
+}
+
 console.log('Setting up socket handlers...');
 registerSocketHandlers(io);
 startBackgroundJobs(io);

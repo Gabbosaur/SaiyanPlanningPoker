@@ -26,6 +26,7 @@ A real-time web application that gamifies agile planning poker sessions with a D
 - **Kamehameha**: Type the name to charge and fire a screen-crossing beam that knocks everyone back.
 - **Genkidama**: A collective ritual. Users on Ki Control raise their arms to donate energy; the sphere grows with the number of raised arms and the ceremony fires when everyone commits. Purely ceremonial, it changes no game state.
 - **Konami code**: Transforms your avatar and triggers a full-screen Super Saiyan 2 spectacle for the whole session.
+- **Name-gated stickers**: Picking a character (or teammate) name unlocks that person's sticker set. Sending one pops it next to your avatar for everyone to see, with motion that matches the emotion. Display names are self-declared, so this is an incentive to use fun names rather than an access control.
 - **Seasonal themes**: Monthly, Halloween and Christmas variants.
 
 ## Target Users
